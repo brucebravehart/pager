@@ -1,16 +1,35 @@
 name: Deploy Frontend
 on:
   push:
-    branches: [main] # Runs every time you push to main
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Debug - List all files
+        run: |
+          echo "Listing root directory:"
+          ls -F
+          echo "Checking for client folder:"
+          ls -R client || echo "CLIENT FOLDER NOT FOUND"
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "./client" # Verify this matches the case of your folder
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./client # This tells the action to ONLY deploy the subfolder
+        id: deployment
+        uses: actions/deploy-pages@v4
