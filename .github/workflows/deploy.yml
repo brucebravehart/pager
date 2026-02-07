@@ -2,33 +2,35 @@ name: Deploy Frontend
 on:
   push:
     branches: [main]
+  workflow_dispatch: # Allows you to manually trigger a deploy from the UI
 
 permissions:
   contents: read
   pages: write
   id-token: write
 
+# Prevents multiple deployments from running at the same time
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
 jobs:
   deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Debug - List all files
-        run: |
-          echo "Listing root directory:"
-          ls -F
-          echo "Checking for client folder:"
-          ls -R client || echo "CLIENT FOLDER NOT FOUND"
-
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v5
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: "./client" # Verify this matches the case of your folder
+          path: "./client" # The specific subfolder for your site
 
       - name: Deploy to GitHub Pages
         id: deployment
