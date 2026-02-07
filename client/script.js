@@ -109,11 +109,6 @@ document.addEventListener('DOMContentLoaded', () => {
             body: JSON.stringify({'name': name})
         })
     });
-
-    document.getElementById('resetBtn').addEventListener('click', () => {
-        localStorage.clear();
-        location.reload();
-    });
 });
 
 async function subscribeUserToPush() {
