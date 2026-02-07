@@ -1,4 +1,4 @@
-const VAPID_PUBLIC_KEY = "YOUR_VAPID_PUBLIC_KEY"; // Get this from your backend
+const VAPID_PUBLIC_KEY = "BFDpLKw1c7dzDfr70rgdWMYI3v6wNX5WXbOxbSqBwzyEL7Md_bWzEblNo8D1s2mmOwNVhfpndrjI_MQQmJda58E"; // Get this from your backend
 const BACKEND_URL = "https://pager-50kf.onrender.com"
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedName = localStorage.getItem('pwa_user_name');
 
     if (savedName) {
-        showHomeScreen(savedName);
+        showHomeScreen(savedName.name);
     } else {
         onboarding.classList.remove('hidden');
     }
@@ -97,6 +97,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('actionBtn').addEventListener('click', () => {
         const btnElement = document.getElementById('actionBtn')
         btnElement.classList.add('pressed')
+
+        const name = localStorage.getItem('pwa_user_name').name;
+
+
+        fetch(BACKEND_URL + '/send-push', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({'name': name})
+        })
     });
 
     document.getElementById('resetBtn').addEventListener('click', () => {
@@ -114,7 +125,6 @@ async function subscribeUserToPush() {
 
     // Send this subscription object to your server to store it
     console.log("Subscription Object:", JSON.stringify(subscription));
-    // await fetch('/save-subscription', { method: 'POST', body: JSON.stringify(subscription) });
 
     return subscription
 }

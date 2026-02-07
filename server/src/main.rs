@@ -2,6 +2,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use web_push::*;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tokio::fs;
@@ -34,7 +35,7 @@ async fn main() {
     let app = Router::new()
         .route("/users", get(get_users))
         .route("/register_user", post(register_user))
-        .route("/save-subscription", post(save_subscription))
+        .route("/save-subscription", post(send_push))
         // Add CORS so your frontend can actually talk to it
         .layer(CorsLayer::permissive());
 
@@ -64,8 +65,10 @@ async fn register_user(Json(payload): Json<User>) -> &'static str {
     }
 }
 
-// POST /save-subscription
-async fn save_subscription(Json(sub): Json<serde_json::Value>) -> &'static str {
+// POST /send-push
+async fn send_push(Json(user): Json<serde_json::Value>) -> &'static str {
+    const VAPID_PUBLIC_KEY = "BFDpLKw1c7dzDfr70rgdWMYI3v6wNX5WXbOxbSqBwzyEL7Md_bWzEblNo8D1s2mmOwNVhfpndrjI_MQQmJda58E"
+    const VAPID_PRIVATE_KEY = "JTxB87ScnjG6HYHsl27b6rA2toFs7wVV1QIiYsOdWwU"
     let mut db = read_db().await;
     db.subscriptions.push(sub);
     write_db(db).await;
