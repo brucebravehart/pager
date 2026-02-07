@@ -1,0 +1,55 @@
+name: Rust Deploy to OCI
+
+on:
+  push:
+    branches: ["main"] # Triggers whenever you push to main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Build Release Binary
+        run: cargo build --release --target x86_64-unknown-linux-gnu
+
+      - name: Deploy to OCI via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Stop the old service if it exists
+            sudo systemctl stop rust-backend || true
+
+            # Ensure the directory exists
+            mkdir -p ~/app
+
+      - name: Upload Binary
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "target/x86_64-unknown-linux-gnu/release/rust-backend" # Replace with your binary name
+          target: "~/app/"
+          strip_components: 4 # Removes the 'target/x86_64.../release/' folder structure
+
+      - name: Restart Service
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Make binary executable and restart
+            chmod +x ~/app/rust-backend
+            sudo systemctl restart rust-backend
