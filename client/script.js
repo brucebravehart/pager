@@ -1,5 +1,5 @@
 const VAPID_PUBLIC_KEY = "BFDpLKw1c7dzDfr70rgdWMYI3v6wNX5WXbOxbSqBwzyEL7Md_bWzEblNo8D1s2mmOwNVhfpndrjI_MQQmJda58E"; // Get this from your backend
-const BACKEND_URL = "https://pager-50kf.onrender.com"
+const BACKEND_URL = "https://132.226.217.85"
 
 document.addEventListener('DOMContentLoaded', () => {
     const onboarding = document.getElementById('onboarding');
@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedName = localStorage.getItem('pwa_user_name');
 
     if (savedName) {
-        showHomeScreen(savedName.name);
+        showHomeScreen(JSON.parse(savedName).name);
     } else {
         onboarding.classList.remove('hidden');
     }
@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Register for Push
                 const subscription = await subscribeUserToPush();
 
-                localStorage.setItem('pwa_user_name', {'name': name, 'subObj': subscription});
+                localStorage.setItem('pwa_user_name', JSON.stringify({'name': name, 'subObj': subscription}));
                 const response = await fetch(BACKEND_URL + '/register_user', {
                     method: 'POST',
                     headers: {
@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnElement = document.getElementById('actionBtn')
         btnElement.classList.add('pressed')
 
-        const name = localStorage.getItem('pwa_user_name').name;
+        const name = JSON.parse(localStorage.getItem('pwa_user_name')).name;
 
 
         fetch(BACKEND_URL + '/send-push', {
