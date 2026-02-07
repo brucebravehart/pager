@@ -1,19 +1,54 @@
-document.getElementById('test-btn').addEventListener('click', async () => {
-    const responseDisplay = document.getElementById('response-text');
-    responseDisplay.innerText = "Connecting to Oracle Cloud...";
+document.addEventListener('DOMContentLoaded', () => {
+    const onboarding = document.getElementById('onboarding');
+    const home = document.getElementById('home');
+    const nameInput = document.getElementById('userNameInput');
+    const displayName = document.getElementById('displayName');
 
-    try {
-        // REPLACE THIS URL with your Oracle Cloud Public IP or Domain later
-        const API_URL = "https://your-oracle-cloud-ip-here.com/api/test";
-        
-        const response = await fetch(API_URL);
-        const data = await response.json();
-        
-        responseDisplay.innerText = `Success! Backend says: ${data.message}`;
-        responseDisplay.style.color = "green";
-    } catch (error) {
-        responseDisplay.innerText = "Error: Could not reach backend. (Check CORS or URL)";
-        responseDisplay.style.color = "red";
-        console.error("Fetch error:", error);
+    // 1. Check if user already exists
+    const savedName = localStorage.getItem('pwa_user_name');
+
+    if (savedName) {
+        showHomeScreen(savedName);
+    } else {
+        onboarding.classList.remove('hidden');
     }
+
+    // 2. Handle Onboarding
+    document.getElementById('getStartedBtn').addEventListener('click', async () => {
+        const name = nameInput.value.trim();
+        if (!name) return alert("Please enter a name");
+
+        // Request Push Permission
+        const permission = await Notification.requestPermission();
+        
+        if (permission === 'granted') {
+            localStorage.setItem('pwa_user_name', name);
+            showHomeScreen(name);
+        } else {
+            alert("Please enable notifications to continue.");
+        }
+    });
+
+    function showHomeScreen(name) {
+        onboarding.classList.add('hidden');
+        home.classList.remove('hidden');
+        displayName.textContent = name;
+    }
+
+    // Home Screen Actions
+    document.getElementById('actionBtn').addEventListener('click', () => {
+        const li = document.createElement('li');
+        li.textContent = `Entry created at ${new Date().toLocaleTimeString()}`;
+        document.getElementById('itemList').appendChild(li);
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+        localStorage.clear();
+        location.reload();
+    });
 });
+
+// Register Service Worker
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+}

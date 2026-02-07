@@ -3,20 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Test Page</title>
+    <title>PWA Connect</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
 </head>
 <body>
 
-    <div class="container">
-        <h1>Frontend Status: <span id="status-tag">Online</span></h1>
-        <p>If you can see this, your HTML and CSS are loading correctly.</p>
-        
-        <hr>
+    <div id="onboarding" class="screen hidden">
+        <h1>Welcome!</h1>
+        <p>Please enter your name to get started.</p>
+        <input type="text" id="userNameInput" placeholder="Your Name">
+        <button id="getStartedBtn">Enable Notifications & Start</button>
+    </div>
 
-        <h3>Backend Connection Test</h3>
-        <button id="test-btn">Check Oracle Cloud Backend</button>
-        <p id="response-text">Waiting for interaction...</p>
+    <div id="home" class="screen hidden">
+        <h1>Hello, <span id="displayName"></span>!</h1>
+        <button id="actionBtn">Add Item to List</button>
+        <ul id="itemList"></ul>
+        <button class="secondary" id="resetBtn">Reset Data</button>
     </div>
 
     <script src="script.js"></script>
