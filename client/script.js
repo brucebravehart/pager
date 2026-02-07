@@ -1,3 +1,6 @@
+const VAPID_PUBLIC_KEY = "YOUR_VAPID_PUBLIC_KEY"; // Get this from your backend
+const BACKEND_URL = "https://pager-50kf.onrender.com"
+
 document.addEventListener('DOMContentLoaded', () => {
     const onboarding = document.getElementById('onboarding');
     const home = document.getElementById('home');
@@ -30,10 +33,13 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const permission = await Notification.requestPermission();
             if (permission === 'granted') {
-                localStorage.setItem('pwa_user_name', name);
+                
                 
                 // Register for Push
-                await subscribeUserToPush();
+                const subscription = await subscribeUserToPush();
+
+                localStorage.setItem('pwa_user_name', {name, subscription});
+
                 showHomeScreen(name);
             } else {
                 alert("Permission denied. We need notifications to work!");
@@ -72,6 +78,8 @@ async function subscribeUserToPush() {
     // Send this subscription object to your server to store it
     console.log("Subscription Object:", JSON.stringify(subscription));
     // await fetch('/save-subscription', { method: 'POST', body: JSON.stringify(subscription) });
+
+    return subscription
 }
 
 function urlBase64ToUint8Array(base64String) {

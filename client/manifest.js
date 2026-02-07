@@ -1,5 +1,5 @@
 {
-  "name": "PWA Connect",
+  "name": "Pager",
   "short_name": "PWA",
   "start_url": "/index.html",
   "display": "standalone",
