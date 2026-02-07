@@ -55,6 +55,9 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("Push registration failed")
             console.error("Push registration failed:", err);
         }
+
+        // TODO: debug
+        showHomeScreen(name);
     });
 
     function showHomeScreen(name) {
