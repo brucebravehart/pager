@@ -38,13 +38,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Register for Push
                 const subscription = await subscribeUserToPush();
 
-                localStorage.setItem('pwa_user_name', {name, subscription});
+                localStorage.setItem('pwa_user_name', {'name': name, 'subObj': subscription});
+                const response = await fetch(BACKEND_URL + '/register_user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({'name': name, 'subObj': subscription})
+                })
 
                 showHomeScreen(name);
             } else {
                 alert("Permission denied. We need notifications to work!");
             }
         } catch (err) {
+            alert("Push registration failed")
             console.error("Push registration failed:", err);
         }
     });
@@ -53,13 +61,39 @@ document.addEventListener('DOMContentLoaded', () => {
         onboarding.classList.add('hidden');
         home.classList.remove('hidden');
         displayName.textContent = name;
+        renderUserList()
+    }
+
+    async function renderUserList() {
+        try {    
+            const response = await fetch(BACKEND_URL + '/users')
+        
+            if (!response.ok) throw new Error('Network response was not ok');
+
+            const data = await response.json();
+
+            const listElement = document.getElementById('itemList')
+
+            listElement.innerHTML = '';
+
+            data.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'item';
+                // Adjust 'item.name' based on what your backend JSON actually looks like
+                li.textContent = item.name || "Unnamed Item"; 
+                listElement.appendChild(li);
+            });
+
+        } catch (error) {
+            console.error("Error fetching data:", error);
+            listElement.innerHTML = `<li style="color:red">Failed to load data. Is the backend running?</li>`;
+        }
     }
 
     // Home Screen Actions
     document.getElementById('actionBtn').addEventListener('click', () => {
-        const li = document.createElement('li');
-        li.textContent = `Entry created at ${new Date().toLocaleTimeString()}`;
-        document.getElementById('itemList').appendChild(li);
+        const btnElement = document.getElementById('actionBtn')
+        btnElement.classList.add('pressed')
     });
 
     document.getElementById('resetBtn').addEventListener('click', () => {
