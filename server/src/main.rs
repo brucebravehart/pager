@@ -40,8 +40,8 @@ async fn main() {
         // Add CORS so your frontend can actually talk to it
         .layer(CorsLayer::permissive());
 
-    // Binding to port 80 requires sudo on Linux
-    let addr = SocketAddr::from(([0, 0, 0, 0], 80));
+    // Binding to port 443 requires sudo on Linux
+    let addr = SocketAddr::from(([0, 0, 0, 0], 443));
     println!("Server running on http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
