@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tokio::fs;
 use tower_http::cors::CorsLayer;
+use dotenvy::dotenv;
+use std::env;
 
 // Matches your JavaScript payload
 #[derive(Serialize, Deserialize, Clone)]
@@ -26,6 +28,9 @@ const DB_PATH: &str = "data.json";
 
 #[tokio::main]
 async fn main() {
+    // get env vars
+    dotenv().ok()
+
     // Initialize DB file if it doesn't exist
     if fs::metadata(DB_PATH).await.is_err() {
         let initial_db = serde_json::to_string(&Db::default()).unwrap();
@@ -68,7 +73,7 @@ async fn register_user(Json(payload): Json<User>) -> &'static str {
 // POST /send-push
 async fn send_push(Json(user): Json<serde_json::Value>) -> &'static str {
     const VAPID_PUBLIC_KEY = "BFDpLKw1c7dzDfr70rgdWMYI3v6wNX5WXbOxbSqBwzyEL7Md_bWzEblNo8D1s2mmOwNVhfpndrjI_MQQmJda58E"
-    const VAPID_PRIVATE_KEY = "JTxB87ScnjG6HYHsl27b6rA2toFs7wVV1QIiYsOdWwU"
+    const VAPID_PRIVATE_KEY = env::var("VAPID_PRIVATE_KEY");
     let mut db = read_db().await;
     db.subscriptions.push(sub);
     write_db(db).await;

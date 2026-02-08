@@ -1,5 +1,5 @@
 const VAPID_PUBLIC_KEY = "BFDpLKw1c7dzDfr70rgdWMYI3v6wNX5WXbOxbSqBwzyEL7Md_bWzEblNo8D1s2mmOwNVhfpndrjI_MQQmJda58E"; // Get this from your backend
-const BACKEND_URL = "https://132.226.217.85"
+const BACKEND_URL = "https://132.226.217.85:80"
 
 document.addEventListener('DOMContentLoaded', () => {
     const onboarding = document.getElementById('onboarding');
