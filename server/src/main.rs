@@ -2,26 +2,20 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use web_push::*;
+use dotenvy::dotenv;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::env;
 use std::net::SocketAddr;
 use tokio::fs;
 use tower_http::cors::CorsLayer;
-use dotenvy::dotenv;
-use std::env;
+use web_push::*;
 
 // Matches your JavaScript payload
-#[derive(Serialize, Deserialize, Clone)]
-struct User {
-    name: String,
-    #[serde(rename = "subObj")]
-    sub_obj: serde_json::Value,
-}
-
 #[derive(Serialize, Deserialize, Default)]
 struct Db {
-    users: Vec<User>,
-    subscriptions: Vec<serde_json::Value>,
+    usernames: Vec<String>,
+    sub_objs: Vec<Value>,
 }
 
 const DB_PATH: &str = "data.json";
@@ -29,12 +23,14 @@ const DB_PATH: &str = "data.json";
 #[tokio::main]
 async fn main() {
     // get env vars
-    dotenv().ok()
+    dotenv().ok();
 
     // Initialize DB file if it doesn't exist
     if fs::metadata(DB_PATH).await.is_err() {
         let initial_db = serde_json::to_string(&Db::default()).unwrap();
-        fs::write(DB_PATH, initial_db).await.expect("Failed to create DB file");
+        fs::write(DB_PATH, initial_db)
+            .await
+            .expect("Failed to create DB file");
     }
 
     let app = Router::new()
@@ -47,7 +43,7 @@ async fn main() {
     // Binding to port 80 requires sudo on Linux
     let addr = SocketAddr::from(([0, 0, 0, 0], 80));
     println!("Server running on http://{}", addr);
-    
+
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
@@ -55,14 +51,17 @@ async fn main() {
 // GET /users
 async fn get_users() -> Json<Vec<User>> {
     let db = read_db().await;
-    Json(db.users)
+    Json(db.usernames)
 }
 
 // POST /register_user
-async fn register_user(Json(payload): Json<User>) -> &'static str {
+async fn register_user(Json(payload): Json<Value>) -> &'static str {
     let mut db = read_db().await;
-    if db.users.len() < 20 {
-        db.users.push(payload);
+    if db.usernames.len() < 20 {
+        let name = payload["name"].as_str().unwrap_or("Unknown").to_string();
+        let sub_obj = payload["subObj"];
+        db.usernames.push(name);
+        db.sub_objs.push(sub_obj);
         write_db(db).await;
         "User registered"
     } else {
@@ -72,21 +71,28 @@ async fn register_user(Json(payload): Json<User>) -> &'static str {
 
 // POST /send-push
 async fn send_push(Json(user): Json<serde_json::Value>) -> &'static str {
-    const VAPID_PUBLIC_KEY = "BFDpLKw1c7dzDfr70rgdWMYI3v6wNX5WXbOxbSqBwzyEL7Md_bWzEblNo8D1s2mmOwNVhfpndrjI_MQQmJda58E"
-    const VAPID_PRIVATE_KEY = env::var("VAPID_PRIVATE_KEY");
-    let mut db = read_db().await;
-    db.subscriptions.push(sub);
-    write_db(db).await;
-    "Subscription saved"
+    let vapid_public_key =
+        "BFDpLKw1c7dzDfr70rgdWMYI3v6wNX5WXbOxbSqBwzyEL7Md_bWzEblNo8D1s2mmOwNVhfpndrjI_MQQmJda58E";
+    let vapid_private_key = env::var("VAPID_PRIVATE_KEY");
+
+    let db = read_db().await;
+    let users = db.users;
+    let subscriptions = db.subscriptions;
+
+    let index = subscriptions.iter().position();
 }
 
 // Helpers for file I/O
 async fn read_db() -> Db {
-    let data = fs::read_to_string(DB_PATH).await.unwrap_or_else(|_| "{}".to_string());
+    let data = fs::read_to_string(DB_PATH)
+        .await
+        .unwrap_or_else(|_| "{}".to_string());
     serde_json::from_str(&data).unwrap_or_default()
 }
 
 async fn write_db(db: Db) {
     let data = serde_json::to_string_pretty(&db).unwrap();
-    fs::write(DB_PATH, data).await.expect("Failed to write to disk");
+    fs::write(DB_PATH, data)
+        .await
+        .expect("Failed to write to disk");
 }
