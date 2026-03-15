@@ -1,4 +1,5 @@
 use axum::{
+    http::StatusCode,
     routing::{get, post},
     Json, Router,
 };
@@ -49,7 +50,7 @@ async fn main() {
 }
 
 // GET /users
-async fn get_users() -> Json<Vec<User>> {
+async fn get_users() -> Json<Vec<String>> {
     let db = read_db().await;
     Json(db.usernames)
 }
@@ -59,7 +60,7 @@ async fn register_user(Json(payload): Json<Value>) -> &'static str {
     let mut db = read_db().await;
     if db.usernames.len() < 20 {
         let name = payload["name"].as_str().unwrap_or("Unknown").to_string();
-        let sub_obj = payload["subObj"];
+        let sub_obj = payload["subObj"].clone();
         db.usernames.push(name);
         db.sub_objs.push(sub_obj);
         write_db(db).await;
@@ -70,7 +71,7 @@ async fn register_user(Json(payload): Json<Value>) -> &'static str {
 }
 
 // POST /send-push
-async fn send_push(Json(payload): Json<Value>) -> &'static str {
+async fn send_push(Json(payload): Json<Value>) -> Result<&'static str, (StatusCode, String)> {
     let vapid_public_key =
         "BFDpLKw1c7dzDfr70rgdWMYI3v6wNX5WXbOxbSqBwzyEL7Md_bWzEblNo8D1s2mmOwNVhfpndrjI_MQQmJda58E";
     let vapid_private_key = env::var("VAPID_PRIVATE_KEY").expect("VAPID_PRIVATE_KEY must be set");
@@ -80,18 +81,21 @@ async fn send_push(Json(payload): Json<Value>) -> &'static str {
     let sub_objs = &db.sub_objs;
 
     let trigger_user = payload["name"].as_str().unwrap_or("Unknown").to_string();
-    let trigger_sub_obj = payload["subObj"];
+    let trigger_sub_obj = payload["subObj"].clone();
 
     let index = sub_objs
         .iter()
         .position(|json| json["endpoint"].as_str() == trigger_sub_obj["endpoint"].as_str());
 
     // Loop through and send to everyone else
-    if let Some(skip_idx) = sender_index {
+    if let Some(skip_idx) = index {
         println!(
             "Sender identified as index {}. Broadcasting to others...",
             skip_idx
         );
+
+        let client = IsahcWebPushClient::new()
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
         for (i, sub) in db.sub_objs.iter().enumerate() {
             if i == skip_idx {
@@ -102,8 +106,13 @@ async fn send_push(Json(payload): Json<Value>) -> &'static str {
             println!("Sending notification to user: {}", db.usernames[i]);
 
             // decode sub_obj
-            let subscription_info: SubscriptionInfo = serde_json::from_value(sub_val.clone())
-                .map_err(|_| WebPushError::InvalidSubscriptionInfo)?;
+            let subscription_info: SubscriptionInfo =
+                serde_json::from_value(sub.clone()).map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Failed to parse subscription from DB: {}", e),
+                    )
+                })?;
 
             // build signature
             let mut sig_builder =
@@ -114,7 +123,7 @@ async fn send_push(Json(payload): Json<Value>) -> &'static str {
             let signature = sig_builder.build().unwrap();
 
             // 3. Construct the message
-            let mut builder = WebPushMessageBuilder::new(&subscription_info)?;
+            let mut builder = WebPushMessageBuilder::new(&subscription_info);
             builder.set_vapid_signature(signature);
             builder.set_payload(
                 ContentEncoding::Aes128Gcm,
@@ -122,12 +131,22 @@ async fn send_push(Json(payload): Json<Value>) -> &'static str {
             );
 
             // 4. Send it via an HTTP client
-            let client = WebPushClient::new()?;
-            client.send(builder.build()?).await?;
+            let message = builder.build().map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Build failed: {}", e),
+                )
+            })?;
+            client.send(message).await.map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Send failed: {}", e),
+                )
+            })?;
         }
-        "Broadcast complete"
+        Ok("Broadcast complete")
     } else {
-        "Sender not recognized. No push sent."
+        Ok("Sender not recognized. No push sent.")
     }
 }
 
