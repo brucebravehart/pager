@@ -34,6 +34,9 @@ jobs:
             # Ensure the directory exists
             mkdir -p ~/app
 
+      - name: Debug File Location
+        run: ls -R server/target/
+
       - name: Upload Binary
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -42,7 +45,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "server/target/x86_64-unknown-linux-gnu/release/rust-backend" # Replace with your binary name
           target: "~/app/"
-          strip_components: 5 # Removes the 'server/target/x86_64.../release/' folder structure
+          strip_components: 4 # Removes the 'server/target/x86_64.../release/' folder structure
 
       - name: Restart Service
         uses: appleboy/ssh-action@v1.0.3
