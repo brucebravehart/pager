@@ -61,6 +61,7 @@ async fn register_user(Json(payload): Json<Value>) -> &'static str {
     if db.usernames.len() < 20 {
         let name = payload["name"].as_str().unwrap_or("Unknown").to_string();
         let sub_obj = payload["subObj"].clone();
+        println!("{}", name);
         db.usernames.push(name);
         db.sub_objs.push(sub_obj);
         write_db(db).await;

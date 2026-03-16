@@ -15,3 +15,8 @@ cargo build --release --target x86_64-unknown-linux-gnu
 ## logging
 
 View all logs for the rust backend: journalctl -u rust-backend
+
+## useful commands
+
+Connect to OCI
+ssh -i "ssh-key-oci-2026-02-07.key" opc@132.226.217.85

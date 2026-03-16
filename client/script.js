@@ -47,6 +47,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({'name': name, 'subObj': subscription})
                 })
 
+                const response_json = await response.json()
+
+                console.log(response, response_json)
+
                 showHomeScreen(name);
             } else {
                 alert("Permission denied. We need notifications to work!");
