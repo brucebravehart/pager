@@ -42,7 +42,7 @@ async fn main() {
         .layer(CorsLayer::permissive());
 
     // Binding to port 443 requires sudo on Linux
-    let addr = SocketAddr::from(([0, 0, 0, 0], 443));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
     println!("Server running on http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
@@ -56,7 +56,7 @@ async fn get_users() -> Json<Vec<String>> {
 }
 
 // POST /register_user
-async fn register_user(Json(payload): Json<Value>) -> &'static str {
+async fn register_user(Json(payload): Json<Value>) -> impl axum::response::IntoResponse {
     let mut db = read_db().await;
     if db.usernames.len() < 20 {
         let name = payload["name"].as_str().unwrap_or("Unknown").to_string();
@@ -65,9 +65,9 @@ async fn register_user(Json(payload): Json<Value>) -> &'static str {
         db.usernames.push(name);
         db.sub_objs.push(sub_obj);
         write_db(db).await;
-        "User registered"
+        (StatusCode::OK, "User registered")
     } else {
-        "User limit reached"
+        (StatusCode::BAD_REQUEST, "User limit reached")
     }
 }
 
