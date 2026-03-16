@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // reset button
-    document,getElementById('resetBtn').addEventListener('click', () => {
+    document.getElementById('resetBtn').addEventListener('click', () => {
         localStorage.clear();
         onboarding.classList.remove('hidden');
         home.classList.add('hidden');
