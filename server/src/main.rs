@@ -61,11 +61,11 @@ async fn main() {
     let router = Router::new()
         .route("/users", get(get_users))
         .route("/register_user", post(register_user))
-        .route("/save-subscription", post(send_push))
-        // Add CORS so your frontend can actually talk to it
-        .layer(cors);
+        .route("/save-subscription", post(send_push));
+    // Add CORS so your frontend can actually talk to it
 
     let app = ServiceBuilder::new()
+        .layer(cors)
         .layer(NormalizePathLayer::trim_trailing_slash())
         .service(router);
 
