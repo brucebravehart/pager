@@ -3,18 +3,23 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-// use axum_server::tls_rustls::RustlsConfig; // Import TLS config
+use axum_server::tls_rustls::RustlsConfig; // Import TLS config
+use base64ct::{Base64UrlUnpadded, Encoding};
 use dotenvy::dotenv;
-use rustls_acme::{caches::DirCache, AcmeConfig};
+use rustls::ServerConfig;
+use rustls_acme::{caches::DirCache, futures_rustls::rustls, AcmeConfig};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::env;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::fs;
 use tokio_stream::StreamExt;
 use tower_http::cors::CorsLayer;
-use web_push::*;
+// use web_push::*;
+use web_push_native::jwt_simple::algorithms::ES256KeyPair;
+use web_push_native::{p256::ecdsa::SigningKey, WebPushBuilder};
 
 // Matches your JavaScript payload
 #[derive(Serialize, Deserialize, Default)]
@@ -67,6 +72,8 @@ async fn main() {
         .cache(DirCache::new(PathBuf::from("./rustls_acme_cache")))
         .directory_lets_encrypt(true); // Use production Let's Encrypt
 
+    let mut state = config.state();
+
     tokio::spawn(async move {
         loop {
             match state.next().await {
@@ -77,22 +84,30 @@ async fn main() {
         }
     });
 
+    let server_config = rustls::ServerConfig::builder()
+        .with_no_client_auth()
+        .with_cert_resolver(state.resolver());
+
+    let rustls_config = Arc::new(server_config);
+    let acceptor = state.axum_acceptor(rustls_config);
+
     // Binding to port 443 requires sudo on Linux
     let addr = SocketAddr::from(([0, 0, 0, 0], 443));
     println!("Server running on http://{}", addr);
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(
+    //let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    /*axum::serve(
         listener,
         acceptor.into_make_service_with_connect_info::<()>(app),
     )
     .await
-    .unwrap(); // old axum setup without tls
+    .unwrap(); // old axum setup without tls*/
 
-    /*axum_server::bind_rustls(addr, config)
-    .serve(app.into_make_service())
-    .await
-    .unwrap();*/
+    axum_server::bind(addr)
+        .acceptor(acceptor)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 }
 
 // GET /users
@@ -140,6 +155,11 @@ async fn send_push(Json(payload): Json<Value>) -> Result<&'static str, (StatusCo
             "Sender identified as index {}. Broadcasting to others...",
             skip_idx
         );
+
+        let decoded_bytes = Base64UrlUnpadded::decode_vec(&vapid_private_key)
+            .expect("VAPID private key is not valid base64");
+        let key_pair = ES256KeyPair::from_bytes(&decoded_bytes)
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
         let client = IsahcWebPushClient::new()
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
