@@ -1,3 +1,4 @@
+use axum::ServiceExt;
 use axum::{
     http::StatusCode,
     routing::{get, post},
@@ -16,7 +17,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs;
 use tokio_stream::StreamExt;
+use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
+use tower_http::normalize_path::NormalizePathLayer;
 // use web_push::*;
 use web_push_native::{
     jwt_simple::algorithms::ES256KeyPair, p256::PublicKey, Auth, Error, WebPushBuilder,
@@ -55,12 +58,16 @@ async fn main() {
         .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
         .allow_headers([axum::http::header::CONTENT_TYPE]);
 
-    let app = Router::new()
+    let router = Router::new()
         .route("/users", get(get_users))
         .route("/register_user", post(register_user))
         .route("/save-subscription", post(send_push))
         // Add CORS so your frontend can actually talk to it
         .layer(cors);
+
+    let app = ServiceBuilder::new()
+        .layer(NormalizePathLayer::trim_trailing_slash())
+        .service(router);
 
     // Load your SSL Certificates
     // You need 'cert.pem' and 'key.pem' in your project folder
@@ -107,7 +114,7 @@ async fn main() {
 
     axum_server::bind(addr)
         .acceptor(acceptor)
-        .serve(app.into_make_service())
+        .serve(tower::make::Shared::new(app))
         .await
         .unwrap();
 }

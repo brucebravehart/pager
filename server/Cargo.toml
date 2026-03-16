@@ -13,7 +13,7 @@ dotenvy = "0.15"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tower-http = { version = "0.5", features = ["cors"] } # For frontend access
+tower-http = { version = "0.5", features = ["cors", "normalize-path"] } # For frontend access
 rustls-acme = { version = "0.13", features = ["axum"] }
 tokio-stream = "0.1"
 hyper = "1.0"
