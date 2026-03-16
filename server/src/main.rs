@@ -58,9 +58,9 @@ async fn main() {
     let app = Router::new()
         .route("/users", get(get_users))
         .route("/register_user", post(register_user))
-        .route("/save-subscription", post(send_push));
-    // Add CORS so your frontend can actually talk to it
-    //.layer(cors);
+        .route("/save-subscription", post(send_push))
+        // Add CORS so your frontend can actually talk to it
+        .layer(cors);
 
     // Load your SSL Certificates
     // You need 'cert.pem' and 'key.pem' in your project folder
