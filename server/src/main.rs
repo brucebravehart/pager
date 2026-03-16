@@ -127,6 +127,7 @@ async fn get_users() -> Json<Vec<String>> {
 
 // POST /register_user
 async fn register_user(Json(payload): Json<Value>) -> impl axum::response::IntoResponse {
+    println!("received request");
     let mut db = read_db().await;
     if db.usernames.len() < 20 {
         let name = payload["name"].as_str().unwrap_or("Unknown").to_string();
