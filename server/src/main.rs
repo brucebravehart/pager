@@ -3,13 +3,16 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use axum_server::tls_rustls::RustlsConfig; // Import TLS config
+// use axum_server::tls_rustls::RustlsConfig; // Import TLS config
 use dotenvy::dotenv;
+use rustls_acme::{caches::DirCache, AcmeConfig};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::env;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use tokio::fs;
+use tokio_stream::StreamExt;
 use tower_http::cors::CorsLayer;
 use web_push::*;
 
@@ -49,27 +52,47 @@ async fn main() {
     let app = Router::new()
         .route("/users", get(get_users))
         .route("/register_user", post(register_user))
-        .route("/save-subscription", post(send_push))
-        // Add CORS so your frontend can actually talk to it
-        .layer(cors);
+        .route("/save-subscription", post(send_push));
+    // Add CORS so your frontend can actually talk to it
+    //.layer(cors);
 
     // Load your SSL Certificates
     // You need 'cert.pem' and 'key.pem' in your project folder
-    let config = RustlsConfig::from_pem_file("cert.pem", "key.pem")
-        .await
-        .expect("Failed to load certificates. Do they exist?");
+    /*let config = RustlsConfig::from_pem_file("cert.pem", "key.pem")
+    .await
+    .expect("Failed to load certificates. Do they exist?");*/
+
+    let config = AcmeConfig::new(["pagerabcde.duckdns.com"]) // Replace with your domain
+        .contact(["mailto:asdf@gmail.com"]) // Replace with your email
+        .cache(DirCache::new(PathBuf::from("./rustls_acme_cache")))
+        .directory_lets_encrypt(true); // Use production Let's Encrypt
+
+    tokio::spawn(async move {
+        loop {
+            match state.next().await {
+                Some(Ok(event)) => println!("ACME Event: {:?}", event),
+                Some(Err(e)) => eprintln!("ACME Error: {:?}", e),
+                None => break,
+            }
+        }
+    });
 
     // Binding to port 443 requires sudo on Linux
     let addr = SocketAddr::from(([0, 0, 0, 0], 443));
     println!("Server running on http://{}", addr);
 
-    //let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    //axum::serve(listener, app).await.unwrap(); // old axum setup without tls
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    axum::serve(
+        listener,
+        acceptor.into_make_service_with_connect_info::<()>(app),
+    )
+    .await
+    .unwrap(); // old axum setup without tls
 
-    axum_server::bind_rustls(addr, config)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    /*axum_server::bind_rustls(addr, config)
+    .serve(app.into_make_service())
+    .await
+    .unwrap();*/
 }
 
 // GET /users
