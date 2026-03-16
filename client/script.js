@@ -38,20 +38,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Register for Push
                 const subscription = await subscribeUserToPush();
 
+                const subscriptionJson = {
+                    endpoint: subscription.endpoint,
+                    // Convert binary ArrayBuffers to Base64 strings
+                    p256dh: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('p256dh')))),
+                    auth: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('auth'))))
+                };
+
                 
                 const response = await fetch(BACKEND_URL + '/register_user', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({'name': name, 'subObj': subscription})
+                    body: JSON.stringify({'name': name, 'subObj': subscriptionJson})
                 })
 
                 const response_json = await response.json()
 
                 console.log(response, response_json)
 
-                localStorage.setItem('pwa_user_name', JSON.stringify({'name': name, 'subObj': subscription}));
+                localStorage.setItem('pwa_user_name', JSON.stringify({'name': name, 'subObj': subscriptionJson}));
 
                 showHomeScreen(name);
             } else {
@@ -105,6 +112,9 @@ document.addEventListener('DOMContentLoaded', () => {
         btnElement.classList.add('pressed')
 
         const name = JSON.parse(localStorage.getItem('pwa_user_name')).name;
+
+        let subscriptionJson = JSON.parse(localStorage.getItem('pwa_user_name')).subObj;
+
 
 
         fetch(BACKEND_URL + '/send-push', {

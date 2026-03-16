@@ -8,7 +8,7 @@ use base64ct::{Base64UrlUnpadded, Encoding};
 use dotenvy::dotenv;
 use rustls::ServerConfig;
 use rustls_acme::{caches::DirCache, futures_rustls::rustls, AcmeConfig};
-use serde::{Deserialize, Serialize};
+use serde::{de::value, Deserialize, Serialize};
 use serde_json::Value;
 use std::env;
 use std::net::SocketAddr;
@@ -18,8 +18,9 @@ use tokio::fs;
 use tokio_stream::StreamExt;
 use tower_http::cors::CorsLayer;
 // use web_push::*;
-use web_push_native::jwt_simple::algorithms::ES256KeyPair;
-use web_push_native::{p256::ecdsa::SigningKey, WebPushBuilder};
+use web_push_native::{
+    jwt_simple::algorithms::ES256KeyPair, p256::PublicKey, Auth, Error, WebPushBuilder,
+};
 
 // Matches your JavaScript payload
 #[derive(Serialize, Deserialize, Default)]
@@ -73,6 +74,14 @@ async fn main() {
         .directory_lets_encrypt(true); // Use production Let's Encrypt
 
     let mut state = config.state();
+    let resolver = state.resolver();
+
+    let server_config = ServerConfig::builder()
+        .with_no_client_auth()
+        .with_cert_resolver(resolver);
+
+    let rustls_config = Arc::new(server_config);
+    let acceptor = state.axum_acceptor(rustls_config);
 
     tokio::spawn(async move {
         loop {
@@ -83,13 +92,6 @@ async fn main() {
             }
         }
     });
-
-    let server_config = rustls::ServerConfig::builder()
-        .with_no_client_auth()
-        .with_cert_resolver(state.resolver());
-
-    let rustls_config = Arc::new(server_config);
-    let acceptor = state.axum_acceptor(rustls_config);
 
     // Binding to port 443 requires sudo on Linux
     let addr = SocketAddr::from(([0, 0, 0, 0], 443));
@@ -161,9 +163,6 @@ async fn send_push(Json(payload): Json<Value>) -> Result<&'static str, (StatusCo
         let key_pair = ES256KeyPair::from_bytes(&decoded_bytes)
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-        let client = IsahcWebPushClient::new()
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
         for (i, sub) in db.sub_objs.iter().enumerate() {
             if i == skip_idx {
                 continue; // Skip the person who triggered the push
@@ -173,43 +172,67 @@ async fn send_push(Json(payload): Json<Value>) -> Result<&'static str, (StatusCo
             println!("Sending notification to user: {}", db.usernames[i]);
 
             // decode sub_obj
-            let subscription_info: SubscriptionInfo =
-                serde_json::from_value(sub.clone()).map_err(|e| {
-                    (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("Failed to parse subscription from DB: {}", e),
-                    )
-                })?;
+            let crnt_sub_obj = sub.clone();
 
-            // build signature
-            let mut sig_builder =
-                VapidSignatureBuilder::from_base64(&vapid_private_key, &subscription_info).unwrap();
+            let endpoint: &str = crnt_sub_obj
+                .get("endpoint")
+                .and_then(|v| v.as_str())
+                .unwrap();
+            let p256dh: &str = crnt_sub_obj.get("p256dh").and_then(|v| v.as_str()).unwrap();
+            let auth: &str = crnt_sub_obj.get("auth").and_then(|v| v.as_str()).unwrap();
 
-            // Some push services require a contact email
-            sig_builder.add_claim("sub", "mailto:admin@yourdomain.com");
-            let signature = sig_builder.build().unwrap();
+            let endpoint = endpoint
+                .parse()
+                .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid endpoint: {}", e)))?;
+            let p256dh = Base64UrlUnpadded::decode_vec(p256dh).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    format!("Invalid p256dh base64: {}", e),
+                )
+            })?;
+            let public_key = PublicKey::from_sec1_bytes(&p256dh).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    format!("Invalid public key bytes: {}", e),
+                )
+            })?;
+            let auth_bytes = Base64UrlUnpadded::decode_vec(auth).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    format!("Invalid auth base64: {}", e),
+                )
+            })?;
 
             // 3. Construct the message
-            let mut builder = WebPushMessageBuilder::new(&subscription_info);
-            builder.set_vapid_signature(signature);
-            builder.set_payload(
-                ContentEncoding::Aes128Gcm,
-                "Hello from your VPS!".as_bytes(),
-            );
+            let builder =
+                WebPushBuilder::new(endpoint, public_key, Auth::clone_from_slice(&auth_bytes))
+                    .with_vapid(&key_pair, "mailto:john.doe@example.com");
 
             // 4. Send it via an HTTP client
-            let message = builder.build().map_err(|e| {
+            let message = "test123".as_bytes().to_vec();
+
+            let request = builder.build(message).map_err(|e| {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     format!("Build failed: {}", e),
                 )
             })?;
-            client.send(message).await.map_err(|e| {
+
+            let reqwest_request = reqwest::Request::try_from(request).map_err(|e| {
                 (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Send failed: {}", e),
+                    reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to build request: {}", e),
                 )
             })?;
+            let client = reqwest::Client::new();
+            let response = client.execute(reqwest_request).await.map_err(|e| {
+                (
+                    reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to send request: {}", e),
+                )
+            })?;
+
+            println!("Status: {}", response.status());
         }
         Ok("Broadcast complete")
     } else {
