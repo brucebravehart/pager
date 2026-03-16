@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Register for Push
                 const subscription = await subscribeUserToPush();
 
-                localStorage.setItem('pwa_user_name', JSON.stringify({'name': name, 'subObj': subscription}));
+                
                 const response = await fetch(BACKEND_URL + '/register_user', {
                     method: 'POST',
                     headers: {
@@ -50,6 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response_json = await response.json()
 
                 console.log(response, response_json)
+
+                localStorage.setItem('pwa_user_name', JSON.stringify({'name': name, 'subObj': subscription}));
 
                 showHomeScreen(name);
             } else {
@@ -112,6 +114,13 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             body: JSON.stringify({'name': name, 'subObj': subscription})
         })
+    });
+
+    // reset button
+    document,getElementById('resetBtn').addEventListener('click', () => {
+        localStorage.clear();
+        onboarding.classList.remove('hidden');
+        home.classList.add('hidden');
     });
 });
 
