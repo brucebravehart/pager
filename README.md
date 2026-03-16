@@ -11,6 +11,7 @@ cargo build --release --target x86_64-unknown-linux-gnu
 - Host backend on OCI
 - Backend sends push to apple servers
 - Apple servers send push to iOS devices
+- we need to talk to the backend via https since the frontend is also secured
 
 ## logging
 

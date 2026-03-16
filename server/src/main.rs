@@ -3,6 +3,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use axum_server::tls_rustls::RustlsConfig; // Import TLS config
 use dotenvy::dotenv;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -34,19 +35,41 @@ async fn main() {
             .expect("Failed to create DB file");
     }
 
+    // network stuff
+
+    let cors = CorsLayer::new()
+        .allow_origin(
+            "https://brucebravehart.github.io"
+                .parse::<axum::http::HeaderValue>()
+                .unwrap(),
+        )
+        .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
+        .allow_headers([axum::http::header::CONTENT_TYPE]);
+
     let app = Router::new()
         .route("/users", get(get_users))
         .route("/register_user", post(register_user))
         .route("/save-subscription", post(send_push))
         // Add CORS so your frontend can actually talk to it
-        .layer(CorsLayer::permissive());
+        .layer(cors);
+
+    // Load your SSL Certificates
+    // You need 'cert.pem' and 'key.pem' in your project folder
+    let config = RustlsConfig::from_pem_file("cert.pem", "key.pem")
+        .await
+        .expect("Failed to load certificates. Do they exist?");
 
     // Binding to port 443 requires sudo on Linux
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 443));
     println!("Server running on http://{}", addr);
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    //let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    //axum::serve(listener, app).await.unwrap(); // old axum setup without tls
+
+    axum_server::bind_rustls(addr, config)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 }
 
 // GET /users
