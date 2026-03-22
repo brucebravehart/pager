@@ -3,8 +3,13 @@ self.addEventListener('install', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-    // Basic fetch handler to allow offline access later
-    e.respondWith(fetch(e.request));
+    e.respondWith(
+        fetch(e.request).catch(err => {
+            console.error('SW Fetch failed:', err);
+            // You could return a custom offline page here
+            return new Response('Network error occurred', { status: 480 });
+        })
+    );
 });
 
 self.addEventListener('push', (event) => {
