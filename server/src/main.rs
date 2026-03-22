@@ -65,8 +65,8 @@ async fn main() {
     // Add CORS so your frontend can actually talk to it
 
     let app = ServiceBuilder::new()
-        .layer(cors)
         .layer(NormalizePathLayer::trim_trailing_slash())
+        .layer(cors)
         .service(router);
 
     // Load your SSL Certificates
