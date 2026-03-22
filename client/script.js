@@ -101,6 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
         } catch (error) {
+            const listElement = document.getElementById('itemList');
             console.error("Error fetching data:", error);
             listElement.innerHTML = `<li style="color:red">Failed to load data. Is the backend running?</li>`;
         }
