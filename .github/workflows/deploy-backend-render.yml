@@ -1,0 +1,28 @@
+name: Rust Deploy to Render
+
+on:
+  push:
+    branches: ["main"] # Triggers whenever you push to main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Build Release Binary
+        working-directory: server
+        run: cargo build --release --target x86_64-unknown-linux-gnu
+
+      - name: Deploy to Render
+        # Only deploy if the build succeeds
+        if: success()
+        run: |
+          curl -f ${{ secrets.RENDER_DEPLOY_HOOK_URL }}

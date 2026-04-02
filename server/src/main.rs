@@ -75,7 +75,7 @@ async fn main() {
     .await
     .expect("Failed to load certificates. Do they exist?");*/
 
-    let config = AcmeConfig::new(["pagerabcde.duckdns.com"]) // Replace with your domain
+    let config = AcmeConfig::new(["pager-87gw.onrender.com"]) // Replace with your domain
         .contact(["mailto:asdf@gmail.com"]) // Replace with your email
         .cache(DirCache::new(PathBuf::from("./rustls_acme_cache")))
         .directory_lets_encrypt(true); // Use production Let's Encrypt
