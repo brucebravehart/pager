@@ -102,7 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const li = document.createElement('li');
                 li.className = 'item';
                 // Adjust 'item.name' based on what your backend JSON actually looks like
-                li.textContent = item.name || "Unnamed Item"; 
+                li.textContent = item || "Unnamed Item"; 
                 listElement.appendChild(li);
             });
 
