@@ -39,6 +39,12 @@ async fn main() {
     // get env vars
     dotenv().ok();
 
+    // get Port from render, else is 10000
+    let port = std::env::var("PORT")
+        .unwrap_or_else(|_| "10000".to_string())
+        .parse::<u16>()
+        .expect("PORT must be a number");
+
     // Initialize DB file if it doesn't exist
     if fs::metadata(DB_PATH).await.is_err() {
         let initial_db = serde_json::to_string(&Db::default()).unwrap();
@@ -101,22 +107,19 @@ async fn main() {
     });
 
     // Binding to port 443 requires sudo on Linux
-    let addr = SocketAddr::from(([0, 0, 0, 0], 443));
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
     println!("Server running on http://{}", addr);
 
-    //let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    /*axum::serve(
-        listener,
-        acceptor.into_make_service_with_connect_info::<()>(app),
-    )
-    .await
-    .unwrap(); // old axum setup without tls*/
-
-    axum_server::bind(addr)
-        .acceptor(acceptor)
-        .serve(tower::make::Shared::new(app))
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    axum::serve(listener, tower::make::Shared::new(app))
         .await
-        .unwrap();
+        .unwrap(); // old axum setup without tls*/
+
+    /*axum_server::bind(addr)
+    .acceptor(acceptor)
+    .serve(tower::make::Shared::new(app))
+    .await
+    .unwrap();*/
 }
 
 // GET /users
