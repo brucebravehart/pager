@@ -47,8 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const subscriptionJson = {
                     endpoint: subscription.endpoint,
                     // Convert binary ArrayBuffers to Base64 strings
-                    p256dh: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('p256dh')))),
-                    auth: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('auth'))))
+                    p256dh: arrayBufferToBase64Url(subscription.getKey('p256dh')),
+                    auth: arrayBufferToBase64Url(subscription.getKey('auth'))
                 };
 
                 
@@ -167,6 +167,14 @@ function urlBase64ToUint8Array(base64String) {
     const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
     const rawData = window.atob(base64);
     return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+}
+
+function arrayBufferToBase64Url(buffer) {
+    const binary = String.fromCharCode(...new Uint8Array(buffer));
+    return btoa(binary)
+        .replace(/\+/g, '-')   // Replace + with -
+        .replace(/\//g, '_')   // Replace / with _
+        .replace(/=+$/, '');    // Remove padding =
 }
 
 // Register Service Worker
