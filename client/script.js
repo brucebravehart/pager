@@ -1,4 +1,4 @@
-const VAPID_PUBLIC_KEY = "BFDpLKw1c7dzDfr70rgdWMYI3v6wNX5WXbOxbSqBwzyEL7Md_bWzEblNo8D1s2mmOwNVhfpndrjI_MQQmJda58E"; // Get this from your backend
+const VAPID_PUBLIC_KEY = "BHONvdPYBAF8hLiQZjImtAz74WpIa2fwwLdzr7CUAyIIQW-f8SPHg-JZGyOwDrXjHWfj4PPIvpeMZjr5HRl29BU"; // Get this from your backend
 const BACKEND_URL = "https://pager-87gw.onrender.com:443"
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -128,10 +128,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!response.ok) throw new Error('Network response was not ok');
 
-            const data = await response.json();
+        const data = await response.json();
 
         } catch (error) {
-            console.error("Push send failed:", err);
+            console.error("Push send failed:", error);
         }
     });
 
