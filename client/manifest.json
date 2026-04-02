@@ -1,7 +1,8 @@
 {
   "name": "Pager",
-  "short_name": "PWA",
-  "start_url": "/index.html",
+  "short_name": "Pager",
+  "start_url": "/pager/",
+  "scope": "/pager/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#007bff",
