@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let subscriptionJson = JSON.parse(localStorage.getItem('pwa_user_name')).subObj;
 
 
-
+        try {
         fetch(BACKEND_URL + '/send-push', {
             method: 'POST',
             headers: {
@@ -125,6 +125,9 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             body: JSON.stringify({'name': name, 'subObj': subscriptionJson})
         })
+        } catch (error) {
+            console.error("Push send failed:", err);
+        }
     });
 
     // reset button
