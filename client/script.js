@@ -34,7 +34,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const permission = await Notification.requestPermission();
             if (permission === 'granted') {
                 
-                
+                // delete old subscription
+                const registration = await navigator.serviceWorker.ready;
+                const existingSubscription = await registration.pushManager.getSubscription();
+                if (existingSubscription) {
+                    await existingSubscription.unsubscribe();
+                    console.log("Old subscription cleared.");
+                }
                 // Register for Push
                 const subscription = await subscribeUserToPush();
 
