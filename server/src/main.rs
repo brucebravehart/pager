@@ -1,6 +1,7 @@
 use axum::ServiceExt;
 use axum::{
     http::StatusCode,
+    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
@@ -33,6 +34,11 @@ struct Db {
 }
 
 const DB_PATH: &str = "data.json";
+
+#[derive(Serialize)]
+struct ApiResponse {
+    message: String,
+}
 
 #[tokio::main]
 async fn main() {
@@ -139,14 +145,21 @@ async fn register_user(Json(payload): Json<Value>) -> impl axum::response::IntoR
         db.usernames.push(name);
         db.sub_objs.push(sub_obj);
         write_db(db).await;
-        (StatusCode::OK, "User registered")
+
+        let response = ApiResponse {
+            message: "User registered".to_string(),
+        };
+        (StatusCode::OK, Json(response))
     } else {
-        (StatusCode::BAD_REQUEST, "User limit reached")
+        let response = ApiResponse {
+            message: "User limit reached".to_string(),
+        };
+        (StatusCode::OK, Json(response))
     }
 }
 
 // POST /send-push
-async fn send_push(Json(payload): Json<Value>) -> Result<&'static str, (StatusCode, String)> {
+async fn send_push(Json(payload): Json<Value>) -> Result<impl IntoResponse, (StatusCode, String)> {
     let vapid_public_key =
         "BFDpLKw1c7dzDfr70rgdWMYI3v6wNX5WXbOxbSqBwzyEL7Md_bWzEblNo8D1s2mmOwNVhfpndrjI_MQQmJda58E";
     let vapid_private_key = env::var("VAPID_PRIVATE_KEY").expect("VAPID_PRIVATE_KEY must be set");
@@ -245,9 +258,15 @@ async fn send_push(Json(payload): Json<Value>) -> Result<&'static str, (StatusCo
 
             println!("Status: {}", response.status());
         }
-        Ok("Broadcast complete")
+        let response = ApiResponse {
+            message: "Broadcast complete".to_string(),
+        };
+        Ok((StatusCode::OK, Json(response)))
     } else {
-        Ok("Sender not recognized. No push sent.")
+        let response = ApiResponse {
+            message: "User limit reached".to_string(),
+        };
+        Ok((StatusCode::OK, Json(response)))
     }
 }
 
