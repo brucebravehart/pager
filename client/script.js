@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Home Screen Actions
-    document.getElementById('actionBtn').addEventListener('click', () => {
+    document.getElementById('actionBtn').addEventListener('click', async () => {
         const btnElement = document.getElementById('actionBtn')
         btnElement.classList.add('pressed')
 
@@ -118,13 +118,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
         try {
-        fetch(BACKEND_URL + '/send-push', {
+        const response = await fetch(BACKEND_URL + '/send-push', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({'name': name, 'subObj': subscriptionJson})
         })
+
+        if (!response.ok) throw new Error('Network response was not ok');
+
+            const data = await response.json();
+
         } catch (error) {
             console.error("Push send failed:", err);
         }

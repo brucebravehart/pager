@@ -87,6 +87,7 @@ async fn main() {
     .await
     .expect("Failed to load certificates. Do they exist?");*/
 
+    /*
     let config = AcmeConfig::new(["pager-87gw.onrender.com"]) // Replace with your domain
         .contact(["mailto:asdf@gmail.com"]) // Replace with your email
         .cache(DirCache::new(PathBuf::from("./rustls_acme_cache")))
@@ -100,8 +101,9 @@ async fn main() {
         .with_cert_resolver(resolver);
 
     let rustls_config = Arc::new(server_config);
-    let acceptor = state.axum_acceptor(rustls_config);
+    let acceptor = state.axum_acceptor(rustls_config);*/
 
+    /*
     tokio::spawn(async move {
         loop {
             match state.next().await {
@@ -110,7 +112,7 @@ async fn main() {
                 None => break,
             }
         }
-    });
+    });*/
 
     // Binding to port 443 requires sudo on Linux
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
