@@ -1,6 +1,7 @@
 // use axum::http::response;
 // use axum::ServiceExt;
 use axum::{
+    extract::State,
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
@@ -13,8 +14,8 @@ use dotenvy::dotenv;
 // use rustls_acme::{caches::DirCache, futures_rustls::rustls, AcmeConfig};
 use serde::{/*de::value, */ Deserialize, Serialize};
 use serde_json::Value;
-use std::env;
 use std::net::SocketAddr;
+use std::{env, string};
 // use std::path::PathBuf;
 // use std::sync::Arc;
 use tokio::fs;
@@ -24,6 +25,10 @@ use tower_http::cors::CorsLayer;
 use tower_http::normalize_path::NormalizePathLayer;
 // use web_push::*;
 use p256::elliptic_curve::sec1::ToEncodedPoint;
+use sqlx::{
+    postgres::{PgPoolOptions, PgRow},
+    PgPool, Postgres, Row,
+};
 use web_push_native::{
     jwt_simple::algorithms::ES256KeyPair, p256::PublicKey, Auth, WebPushBuilder,
 };
@@ -33,6 +38,11 @@ use web_push_native::{
 struct Db {
     usernames: Vec<String>,
     sub_objs: Vec<Value>,
+}
+
+#[derive(Clone)] // This is crucial! Axum clones the state for every request.
+struct AppState {
+    db: PgPool,
 }
 
 const DB_PATH: &str = "data.json";
@@ -52,6 +62,15 @@ async fn main() {
         .unwrap_or_else(|_| "10000".to_string())
         .parse::<u16>()
         .expect("PORT must be a number");
+
+    // connect to db
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await
+        .expect("Failed to connect to DB");
+    let state = AppState { db: pool };
 
     // Initialize DB file if it doesn't exist
     if fs::metadata(DB_PATH).await.is_err() {
@@ -75,7 +94,8 @@ async fn main() {
     let router = Router::new()
         .route("/users", get(get_users))
         .route("/register_user", post(register_user))
-        .route("/send-push", post(send_push));
+        .route("/send-push", post(send_push))
+        .with_state(state);
     // Add CORS so your frontend can actually talk to it
 
     let app = ServiceBuilder::new()
@@ -133,44 +153,84 @@ async fn main() {
 }
 
 // GET /users
-async fn get_users() -> Json<Vec<String>> {
-    let db = read_db().await;
-    Json(db.usernames)
+async fn get_users(State(state): State<AppState>) -> Result<Json<Vec<String>>, String> {
+    let rows = read_db_remote(state.db.clone())
+        .await
+        .map_err(|e| e.to_string())?;
+    let usernames: Vec<String> = rows
+        .iter()
+        .map(|row| {
+            // Extract the "username" column from each row
+            row.get::<String, &str>("username")
+        })
+        .collect();
+
+    Ok(Json(usernames))
+
+    // let db = read_db().await;
+    // Json(db.usernames)
 }
 
 // POST /register_user
-async fn register_user(Json(payload): Json<Value>) -> impl axum::response::IntoResponse {
+async fn register_user(
+    State(state): State<AppState>,
+    Json(payload): Json<Value>,
+) -> impl axum::response::IntoResponse {
     println!("received request");
     let mut db = read_db().await;
     if db.usernames.len() < 20 {
         let name = payload["name"].as_str().unwrap_or("Unknown").to_string();
         let sub_obj = payload["subObj"].clone();
         println!("{}", name);
+
+        let result = write_db_remote(state.db, name.clone(), sub_obj.to_string()).await;
+
         db.usernames.push(name);
         db.sub_objs.push(sub_obj);
         write_db(db).await;
 
-        let response = ApiResponse {
-            message: "User registered".to_string(),
-        };
-        (StatusCode::OK, Json(response))
+        if result.is_err() {
+            let response = ApiResponse {
+                message: "DB Error".to_string(),
+            };
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(response))
+        } else {
+            let response = ApiResponse {
+                message: "User registered".to_string(),
+            };
+            (StatusCode::OK, Json(response))
+        }
     } else {
         let response = ApiResponse {
             message: "User limit reached".to_string(),
         };
-        (StatusCode::OK, Json(response))
+        (StatusCode::BAD_REQUEST, Json(response))
     }
 }
 
 // POST /send-push
-async fn send_push(Json(payload): Json<Value>) -> Result<impl IntoResponse, (StatusCode, String)> {
+async fn send_push(
+    State(state): State<AppState>,
+    Json(payload): Json<Value>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
     let vapid_public_key =
         "BDspVj_KfBb-AOxX8zg69l74H_YRwHXr_D6mk0gdqxKy0UOqFRn1wJeD5JIvgGiSvtbq9feY0J0O4ytzaUzWxJU";
     let vapid_private_key = env::var("VAPID_PRIVATE_KEY").expect("VAPID_PRIVATE_KEY must be set");
 
-    let db = read_db().await;
+    let rows = read_db_remote(state.db.clone())
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let sub_objs: Vec<Value> = rows
+        .iter()
+        .map(|row| row.get::<String, &str>("subscription_json"))
+        // Parse each string into a JSON Value
+        .filter_map(|json_str| serde_json::from_str(&json_str).ok())
+        .collect();
+
+    // let db = read_db().await;
     // let usernames = &db.usernames;
-    let sub_objs = &db.sub_objs;
+    // let sub_objs = &db.sub_objs;
 
     let trigger_user = payload["name"].as_str().unwrap_or("Unknown").to_string();
     let trigger_sub_obj = payload["subObj"].clone();
@@ -191,13 +251,16 @@ async fn send_push(Json(payload): Json<Value>) -> Result<impl IntoResponse, (Sta
         let key_pair = ES256KeyPair::from_bytes(&decoded_bytes)
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-        for (i, sub) in db.sub_objs.iter().enumerate() {
+        for (i, sub) in sub_objs.iter().enumerate() {
             if i == skip_idx {
                 continue; // Skip the person who triggered the push
             }
 
             // This is where you call the actual push logic for each 'sub'
-            println!("Sending notification to user: {}", db.usernames[i]);
+            println!(
+                "Sending notification to user: {}",
+                rows[i].get::<String, &str>("username")
+            );
 
             // decode sub_obj
             let crnt_sub_obj = sub.clone();
@@ -275,6 +338,10 @@ async fn send_push(Json(payload): Json<Value>) -> Result<impl IntoResponse, (Sta
             println!("Status: {}", status);
             println!("Text: {}", response_text);
 
+            if !status.is_success() {
+                let db_del_response = delete_db_remote(state.db.clone(), rows[i].get("id")).await;
+            }
+
             let pub_key_bytes = key_pair.public_key().to_bytes();
             let standard_key = p256::PublicKey::from_sec1_bytes(&pub_key_bytes).map_err(|e| {
                 (
@@ -312,4 +379,35 @@ async fn write_db(db: Db) {
     fs::write(DB_PATH, data)
         .await
         .expect("Failed to write to disk");
+}
+
+async fn write_db_remote(
+    pool: PgPool,
+    user_name: String,
+    sub_obj: String,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("INSERT INTO users (username, subscription_json) VALUES ($1, $2)")
+        .bind(user_name)
+        .bind(sub_obj)
+        .execute(&pool)
+        .await?;
+
+    Ok(())
+}
+
+async fn read_db_remote(pool: PgPool) -> Result<Vec<PgRow>, sqlx::Error> {
+    let rows = sqlx::query("SELECT id, username, subscription_json FROM users")
+        .fetch_all(&pool)
+        .await?;
+
+    Ok(rows)
+}
+
+async fn delete_db_remote(pool: PgPool, id: String) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM users WHERE id = $1")
+        .bind(id)
+        .execute(&pool)
+        .await?;
+
+    Ok(())
 }

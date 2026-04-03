@@ -21,3 +21,4 @@ tower = "0.5"
 axum-server = { version = "0.7", features = ["tls-rustls"] }
 rustls = "0.21"
 base64ct = "1.8"
+sqlx = { version = "0.7", features = ["runtime-tokio", "tls-rustls", "postgres", "macros"] }
