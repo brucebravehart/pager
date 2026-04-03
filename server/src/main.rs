@@ -14,8 +14,8 @@ use dotenvy::dotenv;
 // use rustls_acme::{caches::DirCache, futures_rustls::rustls, AcmeConfig};
 use serde::{/*de::value, */ Deserialize, Serialize};
 use serde_json::Value;
+use std::env;
 use std::net::SocketAddr;
-use std::{env, string};
 // use std::path::PathBuf;
 // use std::sync::Arc;
 use tokio::fs;
@@ -25,10 +25,7 @@ use tower_http::cors::CorsLayer;
 use tower_http::normalize_path::NormalizePathLayer;
 // use web_push::*;
 use p256::elliptic_curve::sec1::ToEncodedPoint;
-use sqlx::{
-    postgres::{PgPoolOptions, PgRow},
-    PgPool, Postgres, Row,
-};
+use sqlx::{postgres::PgPoolOptions, PgPool};
 use web_push_native::{
     jwt_simple::algorithms::ES256KeyPair, p256::PublicKey, Auth, WebPushBuilder,
 };
@@ -156,9 +153,7 @@ async fn main() {
 
 // GET /users
 async fn get_users(State(state): State<AppState>) -> Result<Json<Vec<String>>, String> {
-    let rows = read_db_remote(state.db.clone())
-        .await
-        .map_err(|e| e.to_string())?;
+    let rows = read_db_remote(&state.db).await.map_err(|e| e.to_string())?;
     let usernames: Vec<String> = rows.iter().map(|row| row.1.clone()).collect();
 
     Ok(Json(usernames))
@@ -179,7 +174,7 @@ async fn register_user(
         let sub_obj = payload["subObj"].clone();
         println!("{}", name);
 
-        let result = write_db_remote(state.db, name.clone(), sub_obj.clone()).await;
+        let result = write_db_remote(&state.db, name.clone(), sub_obj.clone()).await;
 
         db.usernames.push(name.clone());
         db.sub_objs.push(sub_obj.clone());
@@ -213,7 +208,7 @@ async fn send_push(
         "BDspVj_KfBb-AOxX8zg69l74H_YRwHXr_D6mk0gdqxKy0UOqFRn1wJeD5JIvgGiSvtbq9feY0J0O4ytzaUzWxJU";
     let vapid_private_key = env::var("VAPID_PRIVATE_KEY").expect("VAPID_PRIVATE_KEY must be set");
 
-    let rows = read_db_remote(state.db.clone())
+    let rows = read_db_remote(&state.db)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -327,7 +322,7 @@ async fn send_push(
             println!("Text: {}", response_text);
 
             if !status.is_success() {
-                let db_del_response = delete_db_remote(state.db.clone(), rows[i].0).await;
+                let _db_del_response = delete_db_remote(&state.db, rows[i].0).await;
             }
 
             let pub_key_bytes = key_pair.public_key().to_bytes();
@@ -374,7 +369,7 @@ async fn write_db(db: Db) {
 }
 
 async fn write_db_remote(
-    pool: PgPool,
+    pool: &PgPool,
     user_name: String,
     sub_obj: Value,
 ) -> Result<(), sqlx::Error> {
@@ -383,15 +378,15 @@ async fn write_db_remote(
         user_name,
         sub_obj
     )
-    .execute(&pool)
+    .execute(pool)
     .await?;
 
     Ok(())
 }
 
-async fn read_db_remote(pool: PgPool) -> Result<Vec<(i32, String, Value)>, sqlx::Error> {
+async fn read_db_remote(pool: &PgPool) -> Result<Vec<(i32, String, Value)>, sqlx::Error> {
     let rows = sqlx::query!("SELECT id, username, subscription_json FROM users")
-        .fetch_all(&pool)
+        .fetch_all(pool)
         .await?;
 
     let rows = rows
@@ -402,9 +397,9 @@ async fn read_db_remote(pool: PgPool) -> Result<Vec<(i32, String, Value)>, sqlx:
     Ok(rows)
 }
 
-async fn delete_db_remote(pool: PgPool, id: i32) -> Result<(), sqlx::Error> {
+async fn delete_db_remote(pool: &PgPool, id: i32) -> Result<(), sqlx::Error> {
     sqlx::query!("DELETE FROM users WHERE id = $1", id)
-        .execute(&pool)
+        .execute(pool)
         .await?;
 
     Ok(())
