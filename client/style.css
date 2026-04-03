@@ -43,6 +43,66 @@ button {
   font-size: 1rem;
   cursor: pointer;
   width: 100%;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 16px rgba(0, 123, 255, 0.2);
+  transition:
+    transform 140ms ease,
+    box-shadow 180ms ease,
+    filter 180ms ease,
+    background-color 180ms ease;
+}
+
+button::after {
+  content: "";
+  position: absolute;
+  inset: -120% -25%;
+  background: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0) 35%,
+    rgba(255, 255, 255, 0.45) 50%,
+    rgba(255, 255, 255, 0) 65%
+  );
+  transform: translateX(-130%);
+  transition: transform 420ms ease;
+  pointer-events: none;
+}
+
+button.is-pressed {
+  transform: translateY(2px) scale(0.985);
+  box-shadow: 0 3px 7px rgba(0, 123, 255, 0.22);
+  filter: saturate(1.06) brightness(0.98);
+}
+
+button.is-pressed::after {
+  transform: translateX(130%);
+}
+
+button.awaiting-completion {
+  filter: saturate(1.15);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.35) inset,
+    0 0 0 1px rgba(0, 123, 255, 0.35),
+    0 8px 20px rgba(0, 123, 255, 0.25);
+}
+
+button.is-releasing {
+  animation: button-release 260ms cubic-bezier(0.2, 0.9, 0.28, 1);
+}
+
+@keyframes button-release {
+  0% {
+    box-shadow: 0 4px 9px rgba(0, 123, 255, 0.2);
+    filter: brightness(0.99);
+  }
+  45% {
+    box-shadow: 0 12px 24px rgba(0, 123, 255, 0.27);
+    filter: brightness(1.05);
+  }
+  100% {
+    box-shadow: 0 8px 16px rgba(0, 123, 255, 0.2);
+    filter: brightness(1);
+  }
 }
 
 .minimal-reset {
@@ -59,10 +119,15 @@ button {
   border-radius: 999px;
   backdrop-filter: blur(2px);
   z-index: 999;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
 }
 
 .minimal-reset:hover {
   background: rgba(0, 0, 0, 0.1);
+}
+
+.minimal-reset.is-pressed {
+  transform: translateX(-50%) translateY(2px) scale(0.985);
 }
 
 button.secondary {

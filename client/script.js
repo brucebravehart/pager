@@ -8,6 +8,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const home = document.getElementById('home');
     const nameInput = document.getElementById('userNameInput');
     const displayName = document.getElementById('displayName');
+    const getStartedBtn = document.getElementById('getStartedBtn');
+    const actionBtn = document.getElementById('actionBtn');
+    const resetBtn = document.getElementById('resetBtn');
     const reloadUsersBtn = document.getElementById('reloadUsersBtn');
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
@@ -22,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 2. Handle Onboarding
-    document.getElementById('getStartedBtn').addEventListener('click', async () => {
+    bindAnimatedButton(getStartedBtn, async () => {
         const name = nameInput.value.trim();
         if (!name) return alert("Please enter a name");
 
@@ -80,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // TODO: debug
         showHomeScreen(name);
-    });
+    }, { waitForActionCompletion: true });
 
     function showHomeScreen(name) {
         onboarding.classList.add('hidden');
@@ -126,17 +129,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    if (reloadUsersBtn) {
-        reloadUsersBtn.addEventListener('click', () => {
-            renderUserList();
-        });
-    }
+    bindAnimatedButton(reloadUsersBtn, async () => {
+        await renderUserList();
+    }, { waitForActionCompletion: true });
 
     // Home Screen Actions
-    document.getElementById('actionBtn').addEventListener('click', async () => {
-        const btnElement = document.getElementById('actionBtn')
-        btnElement.classList.add('pressed')
-
+    bindAnimatedButton(actionBtn, async () => {
         const name = JSON.parse(localStorage.getItem('pwa_user_name')).name;
 
         let subscriptionJson = JSON.parse(localStorage.getItem('pwa_user_name')).subObj;
@@ -158,14 +156,79 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Push send failed:", error);
         }
-    });
+    }, { waitForActionCompletion: true });
 
     // reset button
-    document.getElementById('resetBtn').addEventListener('click', () => {
+    bindAnimatedButton(resetBtn, () => {
         localStorage.clear();
         onboarding.classList.remove('hidden');
         home.classList.add('hidden');
     });
+
+    function bindAnimatedButton(button, action, options = {}) {
+        if (!button || typeof action !== 'function') return;
+
+        const { waitForActionCompletion = false } = options;
+        let isPointerDown = false;
+        let isRunning = false;
+
+        const runReleaseAnimation = () => {
+            button.classList.remove('is-pressed', 'awaiting-completion');
+            button.classList.add('is-releasing');
+            window.setTimeout(() => {
+                button.classList.remove('is-releasing');
+            }, 280);
+        };
+
+        button.addEventListener('pointerdown', () => {
+            if (button.disabled) return;
+            isPointerDown = true;
+            button.classList.remove('is-releasing');
+            button.classList.remove('awaiting-completion');
+            button.classList.add('is-pressed');
+        });
+
+        button.addEventListener('pointerup', () => {
+            isPointerDown = false;
+            if (isRunning && waitForActionCompletion) {
+                button.classList.add('awaiting-completion');
+                return;
+            }
+            runReleaseAnimation();
+        });
+
+        button.addEventListener('pointercancel', () => {
+            isPointerDown = false;
+            if (!isRunning) {
+                runReleaseAnimation();
+            }
+        });
+
+        button.addEventListener('click', async (event) => {
+            if (button.disabled || isRunning) return;
+            isRunning = true;
+
+            if (!button.classList.contains('is-pressed')) {
+                button.classList.add('is-pressed');
+            }
+
+            try {
+                await action(event);
+            } finally {
+                isRunning = false;
+
+                if (waitForActionCompletion) {
+                    if (isPointerDown) {
+                        button.classList.add('awaiting-completion');
+                    } else {
+                        runReleaseAnimation();
+                    }
+                } else if (!isPointerDown) {
+                    runReleaseAnimation();
+                }
+            }
+        });
+    }
 });
 
 async function subscribeUserToPush() {
