@@ -237,7 +237,12 @@ async fn send_push(Json(payload): Json<Value>) -> Result<impl IntoResponse, (Sta
                     .with_vapid(&key_pair, "mailto:john.doe@example.com");
 
             // 4. Send it via an HTTP client
-            let message = "test123".as_bytes().to_vec();
+            let payload = serde_json::json!({
+                "title": "New Alert!",
+                "body": "Someone triggered a push!",
+                "url": "/"
+            });
+            let message = payload.to_string().into_bytes();
 
             let request = builder.build(message).map_err(|e| {
                 (
