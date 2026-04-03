@@ -94,12 +94,12 @@ async fn main() {
         .route("/register_user", post(register_user))
         .route("/send-push", post(send_push))
         .route("/status", get(return_status))
-        .with_state(state);
+        .with_state(state)
+        .layer(cors);
     // Add CORS so your frontend can actually talk to it
 
     let app = ServiceBuilder::new()
         .layer(NormalizePathLayer::trim_trailing_slash())
-        .layer(cors)
         .service(router);
 
     // Load your SSL Certificates
@@ -373,32 +373,28 @@ async fn write_db_remote(
     user_name: String,
     sub_obj: Value,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query!(
-        "INSERT INTO users (username, subscription_json) VALUES ($1, $2)",
-        user_name,
-        sub_obj
-    )
-    .execute(pool)
-    .await?;
+    sqlx::query("INSERT INTO users (username, subscription_json) VALUES ($1, $2)")
+        .bind(user_name)
+        .bind(sub_obj)
+        .execute(pool)
+        .await?;
 
     Ok(())
 }
 
 async fn read_db_remote(pool: &PgPool) -> Result<Vec<(i32, String, Value)>, sqlx::Error> {
-    let rows = sqlx::query!("SELECT id, username, subscription_json FROM users")
-        .fetch_all(pool)
-        .await?;
-
-    let rows = rows
-        .into_iter()
-        .map(|r| (r.id, r.username, r.subscription_json))
-        .collect();
+    let rows = sqlx::query_as::<_, (i32, String, Value)>(
+        "SELECT id, username, subscription_json FROM users",
+    )
+    .fetch_all(pool)
+    .await?;
 
     Ok(rows)
 }
 
 async fn delete_db_remote(pool: &PgPool, id: i32) -> Result<(), sqlx::Error> {
-    sqlx::query!("DELETE FROM users WHERE id = $1", id)
+    sqlx::query("DELETE FROM users WHERE id = $1")
+        .bind(id)
         .execute(pool)
         .await?;
 
