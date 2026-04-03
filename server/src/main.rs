@@ -62,13 +62,12 @@ async fn main() {
 
     // connect to db
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let database_url = "postgresql://neondb_owner:npg_YOrRA0Kt6cfm@ep-quiet-art-alcgs14k.c-3.eu-central-1.aws.neon.tech/neondb";
     println!("format {database_url}");
 
     let options = sqlx::postgres::PgConnectOptions::new()
         .host("ep-quiet-art-alcgs14k.c-3.eu-central-1.aws.neon.tech")
         .username("neondb_owner")
-        .password("npg_YOrRA0Kt6cfm")
+        .password(&database_url)
         .database("neondb")
         .ssl_mode(sqlx::postgres::PgSslMode::Require);
 
