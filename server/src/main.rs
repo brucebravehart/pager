@@ -95,6 +95,7 @@ async fn main() {
         .route("/users", get(get_users))
         .route("/register_user", post(register_user))
         .route("/send-push", post(send_push))
+        .route("/status", get(return_status))
         .with_state(state);
     // Add CORS so your frontend can actually talk to it
 
@@ -364,6 +365,10 @@ async fn send_push(
         };
         Ok((StatusCode::OK, Json(response)))
     }
+}
+
+async fn return_status() -> StatusCode {
+    StatusCode::OK
 }
 
 // Helpers for file I/O

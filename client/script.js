@@ -13,8 +13,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const actionBtn = document.getElementById('actionBtn');
     const resetBtn = document.getElementById('resetBtn');
     const reloadUsersBtn = document.getElementById('reloadUsersBtn');
+    const serverWakeIndicator = document.getElementById('serverWakeIndicator');
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+    wakeBackendServer();
 
     // 1. Check if user already exists
     const savedName = localStorage.getItem('pwa_user_name');
@@ -237,6 +240,53 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
+    }
+
+    async function wakeBackendServer() {
+        setServerIndicatorState('waking', 'Waking server...');
+
+        const timeoutController = new AbortController();
+        const timeoutId = window.setTimeout(() => {
+            timeoutController.abort();
+        }, 8000);
+
+        try {
+            const response = await fetch(BACKEND_URL + '/status', {
+                method: 'GET',
+                cache: 'no-store',
+                signal: timeoutController.signal
+            });
+
+            if (response.ok) {
+                setServerIndicatorState('online', 'Server ready');
+            } else {
+                setServerIndicatorState('offline', 'Server error');
+            }
+        } catch (error) {
+            setServerIndicatorState('offline', 'Server unreachable');
+            console.error('Wake request failed:', error);
+        } finally {
+            window.clearTimeout(timeoutId);
+        }
+    }
+
+    function setServerIndicatorState(state, text) {
+        if (!serverWakeIndicator) return;
+
+        serverWakeIndicator.classList.remove('is-waking', 'is-online', 'is-offline');
+
+        if (state === 'online') {
+            serverWakeIndicator.classList.add('is-online');
+        } else if (state === 'offline') {
+            serverWakeIndicator.classList.add('is-offline');
+        } else {
+            serverWakeIndicator.classList.add('is-waking');
+        }
+
+        const label = serverWakeIndicator.querySelector('.status-text');
+        if (label) {
+            label.textContent = text;
+        }
     }
 });
 
