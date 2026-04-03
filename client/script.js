@@ -1,4 +1,4 @@
-const VAPID_PUBLIC_KEY = "BHONvdPYBAF8hLiQZjImtAz74WpIa2fwwLdzr7CUAyIIQW-f8SPHg-JZGyOwDrXjHWfj4PPIvpeMZjr5HRl29BU"; // Get this from your backend
+const VAPID_PUBLIC_KEY = "BDspVj_KfBb-AOxX8zg69l74H_YRwHXr_D6mk0gdqxKy0UOqFRn1wJeD5JIvgGiSvtbq9feY0J0O4ytzaUzWxJU"; // Get this from your backend
 const BACKEND_URL = "https://pager-87gw.onrender.com:443"
 
 document.addEventListener('DOMContentLoaded', () => {

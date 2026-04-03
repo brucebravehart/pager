@@ -164,7 +164,7 @@ async fn register_user(Json(payload): Json<Value>) -> impl axum::response::IntoR
 // POST /send-push
 async fn send_push(Json(payload): Json<Value>) -> Result<impl IntoResponse, (StatusCode, String)> {
     let vapid_public_key =
-        "BFDpLKw1c7dzDfr70rgdWMYI3v6wNX5WXbOxbSqBwzyEL7Md_bWzEblNo8D1s2mmOwNVhfpndrjI_MQQmJda58E";
+        "BDspVj_KfBb-AOxX8zg69l74H_YRwHXr_D6mk0gdqxKy0UOqFRn1wJeD5JIvgGiSvtbq9feY0J0O4ytzaUzWxJU";
     let vapid_private_key = env::var("VAPID_PRIVATE_KEY").expect("VAPID_PRIVATE_KEY must be set");
 
     let db = read_db().await;
