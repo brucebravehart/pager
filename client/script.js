@@ -248,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const timeoutController = new AbortController();
         const timeoutId = window.setTimeout(() => {
             timeoutController.abort();
-        }, 8000);
+        }, 40000);
 
         try {
             const response = await fetch(BACKEND_URL + '/status', {
