@@ -158,13 +158,7 @@ async fn get_users(State(state): State<AppState>) -> Result<Json<Vec<String>>, S
     let rows = read_db_remote(state.db.clone())
         .await
         .map_err(|e| e.to_string())?;
-    let usernames: Vec<String> = rows
-        .iter()
-        .map(|row| {
-            // Extract the "username" column from each row
-            row.get::<String, &str>("username")
-        })
-        .collect();
+    let usernames: Vec<String> = rows.iter().map(|row| row.1.clone()).collect();
 
     Ok(Json(usernames))
 
@@ -184,10 +178,10 @@ async fn register_user(
         let sub_obj = payload["subObj"].clone();
         println!("{}", name);
 
-        let result = write_db_remote(state.db, name.clone(), sub_obj.to_string()).await;
+        let result = write_db_remote(state.db, name.clone(), sub_obj.clone()).await;
 
-        db.usernames.push(name);
-        db.sub_objs.push(sub_obj);
+        db.usernames.push(name.clone());
+        db.sub_objs.push(sub_obj.clone());
         write_db(db).await;
 
         if result.is_err() {
@@ -222,12 +216,7 @@ async fn send_push(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let sub_objs: Vec<Value> = rows
-        .iter()
-        .map(|row| row.get::<String, &str>("subscription_json"))
-        // Parse each string into a JSON Value
-        .filter_map(|json_str| serde_json::from_str(&json_str).ok())
-        .collect();
+    let sub_objs: Vec<Value> = rows.iter().map(|row| row.2.clone()).collect();
 
     // let db = read_db().await;
     // let usernames = &db.usernames;
@@ -258,10 +247,7 @@ async fn send_push(
             }
 
             // This is where you call the actual push logic for each 'sub'
-            println!(
-                "Sending notification to user: {}",
-                rows[i].get::<String, &str>("username")
-            );
+            println!("Sending notification to user: {}", rows[i].1.clone());
 
             // decode sub_obj
             let crnt_sub_obj = sub.clone();
@@ -340,7 +326,7 @@ async fn send_push(
             println!("Text: {}", response_text);
 
             if !status.is_success() {
-                let db_del_response = delete_db_remote(state.db.clone(), rows[i].get("id")).await;
+                let db_del_response = delete_db_remote(state.db.clone(), rows[i].0).await;
             }
 
             let pub_key_bytes = key_pair.public_key().to_bytes();
@@ -389,28 +375,34 @@ async fn write_db(db: Db) {
 async fn write_db_remote(
     pool: PgPool,
     user_name: String,
-    sub_obj: String,
+    sub_obj: Value,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("INSERT INTO users (username, subscription_json) VALUES ($1, $2)")
-        .bind(user_name)
-        .bind(sub_obj)
-        .execute(&pool)
-        .await?;
+    sqlx::query!(
+        "INSERT INTO users (username, subscription_json) VALUES ($1, $2)",
+        user_name,
+        sub_obj
+    )
+    .execute(&pool)
+    .await?;
 
     Ok(())
 }
 
-async fn read_db_remote(pool: PgPool) -> Result<Vec<PgRow>, sqlx::Error> {
-    let rows = sqlx::query("SELECT id, username, subscription_json FROM users")
+async fn read_db_remote(pool: PgPool) -> Result<Vec<(i32, String, Value)>, sqlx::Error> {
+    let rows = sqlx::query!("SELECT id, username, subscription_json FROM users")
         .fetch_all(&pool)
         .await?;
+
+    let rows = rows
+        .into_iter()
+        .map(|r| (r.id, r.username, r.subscription_json))
+        .collect();
 
     Ok(rows)
 }
 
-async fn delete_db_remote(pool: PgPool, id: String) -> Result<(), sqlx::Error> {
-    sqlx::query("DELETE FROM users WHERE id = $1")
-        .bind(id)
+async fn delete_db_remote(pool: PgPool, id: i32) -> Result<(), sqlx::Error> {
+    sqlx::query!("DELETE FROM users WHERE id = $1", id)
         .execute(&pool)
         .await?;
 
