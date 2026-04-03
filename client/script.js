@@ -1,6 +1,8 @@
 const VAPID_PUBLIC_KEY = "BDspVj_KfBb-AOxX8zg69l74H_YRwHXr_D6mk0gdqxKy0UOqFRn1wJeD5JIvgGiSvtbq9feY0J0O4ytzaUzWxJU"; // Get this from your backend
 const BACKEND_URL = "https://pager-87gw.onrender.com:443"
 
+disablePinchZoom();
+
 document.addEventListener('DOMContentLoaded', () => {
     const onboarding = document.getElementById('onboarding');
     const home = document.getElementById('home');
@@ -180,4 +182,18 @@ function arrayBufferToBase64Url(buffer) {
 // Register Service Worker
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js');
+}
+
+function disablePinchZoom() {
+    // Prevent iOS pinch gestures.
+    document.addEventListener('gesturestart', (event) => {
+        event.preventDefault();
+    });
+
+    // Prevent multi-touch zoom on modern mobile browsers.
+    document.addEventListener('touchmove', (event) => {
+        if (event.touches.length > 1) {
+            event.preventDefault();
+        }
+    }, { passive: false });
 }
