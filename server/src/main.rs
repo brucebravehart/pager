@@ -259,6 +259,8 @@ async fn send_push(Json(payload): Json<Value>) -> Result<impl IntoResponse, (Sta
             })?;
 
             println!("Status: {}", response.status());
+            println!("Text: {}", response.text());
+            println!("Json: {}", response.json())
         }
         let response = ApiResponse {
             message: "Broadcast complete".to_string(),
