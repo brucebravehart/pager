@@ -17,8 +17,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body,
-    icon: '/images/icon.png',
-    badge: '/images/badge.png', // Shown in the Android status bar
+    icon: 'alert_small.png',
+    badge: 'alert_small_bw.png', // Shown in the Android status bar
     vibrate: [100, 50, 100],
     data: { url: data.url }
   };
