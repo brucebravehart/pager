@@ -2,7 +2,10 @@ name: Rust Deploy to OCI
 
 on:
   push:
-    branches: ["main"] # Triggers whenever you push to main
+    branches: ["main"]
+    paths:
+      - "server/**"
+      - ".github/workflows/deploy-backend.yml"
 
 jobs:
   build-and-deploy:

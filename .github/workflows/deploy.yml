@@ -2,6 +2,9 @@ name: Deploy Frontend
 on:
   push:
     branches: [main]
+    paths:
+      - "client/**"
+      - ".github/workflows/deploy.yml"
   workflow_dispatch: # Allows you to manually trigger a deploy from the UI
 
 permissions:
