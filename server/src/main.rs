@@ -1,30 +1,31 @@
-use axum::http::response;
-use axum::ServiceExt;
+// use axum::http::response;
+// use axum::ServiceExt;
 use axum::{
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
-use axum_server::tls_rustls::RustlsConfig; // Import TLS config
+// use axum_server::tls_rustls::RustlsConfig; // Import TLS config
 use base64ct::{Base64UrlUnpadded, Encoding};
 use dotenvy::dotenv;
-use rustls::ServerConfig;
+// use rustls::ServerConfig;
 use rustls_acme::{caches::DirCache, futures_rustls::rustls, AcmeConfig};
 use serde::{de::value, Deserialize, Serialize};
 use serde_json::Value;
 use std::env;
 use std::net::SocketAddr;
-use std::path::PathBuf;
+// use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs;
-use tokio_stream::StreamExt;
+// use tokio_stream::StreamExt;
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
 use tower_http::normalize_path::NormalizePathLayer;
 // use web_push::*;
+use p256::elliptic_curve::sec1::ToEncodedPoint;
 use web_push_native::{
-    jwt_simple::algorithms::ES256KeyPair, p256::PublicKey, Auth, Error, WebPushBuilder,
+    jwt_simple::algorithms::ES256KeyPair, p256::PublicKey, Auth, WebPushBuilder,
 };
 
 // Matches your JavaScript payload
@@ -168,10 +169,10 @@ async fn send_push(Json(payload): Json<Value>) -> Result<impl IntoResponse, (Sta
     let vapid_private_key = env::var("VAPID_PRIVATE_KEY").expect("VAPID_PRIVATE_KEY must be set");
 
     let db = read_db().await;
-    let usernames = &db.usernames;
+    // let usernames = &db.usernames;
     let sub_objs = &db.sub_objs;
 
-    let trigger_user = payload["name"].as_str().unwrap_or("Unknown").to_string();
+    // let trigger_user = payload["name"].as_str().unwrap_or("Unknown").to_string();
     let trigger_sub_obj = payload["subObj"].clone();
 
     let index = sub_objs
@@ -268,8 +269,16 @@ async fn send_push(Json(payload): Json<Value>) -> Result<impl IntoResponse, (Sta
             })?;
             println!("Status: {}", status);
             println!("Text: {}", response_text);
-            let derived_public_key =
-                Base64UrlUnpadded::encode_string(&key_pair.public_key().to_bytes());
+
+            let pub_key_bytes = key_pair.public_key().to_bytes();
+            let standard_key = p256::PublicKey::from_sec1_bytes(&pub_key_bytes).map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Key bridge failed: {}", e),
+                )
+            })?;
+            let encoded_point = standard_key.to_encoded_point(false);
+            let derived_public_key = Base64UrlUnpadded::encode_string(encoded_point.as_bytes());
             println!("Derived: {}", derived_public_key);
             println!("Hardcoded: {}", vapid_public_key);
         }
