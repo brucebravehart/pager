@@ -268,6 +268,10 @@ async fn send_push(Json(payload): Json<Value>) -> Result<impl IntoResponse, (Sta
             })?;
             println!("Status: {}", status);
             println!("Text: {}", response_text);
+            let derived_public_key =
+                Base64UrlUnpadded::encode_string(&key_pair.public_key().to_bytes());
+            println!("Derived: {}", derived_public_key);
+            println!("Hardcoded: {}", vapid_public_key);
         }
         let response = ApiResponse {
             message: "Broadcast complete".to_string(),
