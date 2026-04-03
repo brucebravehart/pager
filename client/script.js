@@ -4,6 +4,7 @@ const BACKEND_URL = "https://pager-87gw.onrender.com:443"
 disablePinchZoom();
 
 document.addEventListener('DOMContentLoaded', () => {
+    const reloadSpinDurationMs = 800;
     const onboarding = document.getElementById('onboarding');
     const home = document.getElementById('home');
     const nameInput = document.getElementById('userNameInput');
@@ -93,6 +94,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function renderUserList() {
+        const spinStart = performance.now();
+
         if (reloadUsersBtn) {
             reloadUsersBtn.disabled = true;
             reloadUsersBtn.classList.add('reloading');
@@ -123,6 +126,12 @@ document.addEventListener('DOMContentLoaded', () => {
             listElement.innerHTML = `<li style="color:red">Failed to load data. Is the backend running?</li>`;
         } finally {
             if (reloadUsersBtn) {
+                const elapsed = performance.now() - spinStart;
+                const remaining = Math.max(0, reloadSpinDurationMs - elapsed);
+                if (remaining > 0) {
+                    await new Promise((resolve) => window.setTimeout(resolve, remaining));
+                }
+
                 reloadUsersBtn.disabled = false;
                 reloadUsersBtn.classList.remove('reloading');
             }

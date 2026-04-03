@@ -172,7 +172,7 @@ async fn send_push(Json(payload): Json<Value>) -> Result<impl IntoResponse, (Sta
     // let usernames = &db.usernames;
     let sub_objs = &db.sub_objs;
 
-    // let trigger_user = payload["name"].as_str().unwrap_or("Unknown").to_string();
+    let trigger_user = payload["name"].as_str().unwrap_or("Unknown").to_string();
     let trigger_sub_obj = payload["subObj"].clone();
 
     let index = sub_objs
@@ -238,8 +238,8 @@ async fn send_push(Json(payload): Json<Value>) -> Result<impl IntoResponse, (Sta
 
             // 4. Send it via an HTTP client
             let payload = serde_json::json!({
-                "title": "New Alert!",
-                "body": "Someone triggered a push!",
+                "title": "GROSS ALARM!",
+                "body": format!("ausgelöst durch {}", trigger_user),
                 "url": "/"
             });
             let message = payload.to_string().into_bytes();
