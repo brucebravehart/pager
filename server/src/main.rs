@@ -1,3 +1,4 @@
+use axum::http::response;
 use axum::ServiceExt;
 use axum::{
     http::StatusCode,
@@ -258,9 +259,17 @@ async fn send_push(Json(payload): Json<Value>) -> Result<impl IntoResponse, (Sta
                 )
             })?;
 
+            let response_text = response.text().await.map_err(|e| {
+                (
+                    reqwest::StatusCode::INTERNAL_SERVER_ERROR, // Or a specific code
+                    format!("Failed to read response body: {}", e),
+                )
+            })?;
+            let response_json = response.json::<serde_json::Value>().await?;
+
             println!("Status: {}", response.status());
-            println!("Text: {}", response.text());
-            println!("Json: {}", response.json())
+            println!("Text: {}", response_text);
+            println!("Json: {}", response_json);
         }
         let response = ApiResponse {
             message: "Broadcast complete".to_string(),
