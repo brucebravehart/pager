@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const home = document.getElementById('home');
     const nameInput = document.getElementById('userNameInput');
     const displayName = document.getElementById('displayName');
+    const reloadUsersBtn = document.getElementById('reloadUsersBtn');
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
@@ -89,6 +90,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function renderUserList() {
+        if (reloadUsersBtn) {
+            reloadUsersBtn.disabled = true;
+            reloadUsersBtn.classList.add('reloading');
+        }
+
         try {    
             const response = await fetch(BACKEND_URL + '/users')
         
@@ -112,7 +118,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const listElement = document.getElementById('itemList');
             console.error("Error fetching data:", error);
             listElement.innerHTML = `<li style="color:red">Failed to load data. Is the backend running?</li>`;
+        } finally {
+            if (reloadUsersBtn) {
+                reloadUsersBtn.disabled = false;
+                reloadUsersBtn.classList.remove('reloading');
+            }
         }
+    }
+
+    if (reloadUsersBtn) {
+        reloadUsersBtn.addEventListener('click', () => {
+            renderUserList();
+        });
     }
 
     // Home Screen Actions
