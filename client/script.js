@@ -192,54 +192,60 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 280);
         };
 
-        button.addEventListener('pointerdown', () => {
-            if (button.disabled) return;
+        button.addEventListener('pointerdown', (e) => {
+            if (button.disabled || isRunning) return;
+            
+            // Keeps the interaction attached to the button even if the finger slides off
+            button.setPointerCapture(e.pointerId); 
+            
             isPointerDown = true;
-            button.classList.remove('is-releasing');
-            button.classList.remove('awaiting-completion');
+            button.classList.remove('is-releasing', 'awaiting-completion');
             button.classList.add('is-pressed');
         });
 
-        button.addEventListener('pointerup', () => {
+        button.addEventListener('pointerup', async (e) => {
+            if (!isPointerDown) return;
             isPointerDown = false;
-            if (isRunning && waitForActionCompletion) {
-                button.classList.add('awaiting-completion');
+            
+            try { button.releasePointerCapture(e.pointerId); } catch(err) {}
+
+            // 1. If we are already running, we just update the visual state
+            if (isRunning) {
+                if (waitForActionCompletion) {
+                    button.classList.add('awaiting-completion');
+                }
                 return;
             }
-            runReleaseAnimation();
-        });
 
-        button.addEventListener('pointercancel', () => {
-            isPointerDown = false;
-            if (!isRunning) {
-                runReleaseAnimation();
-            }
-        });
-
-        button.addEventListener('click', async (event) => {
-            if (button.disabled || isRunning) return;
+            // 2. Start the Action
             isRunning = true;
-
-            if (!button.classList.contains('is-pressed')) {
-                button.classList.add('is-pressed');
-            }
-
+            
             try {
-                await action(event);
+                await action(e);
+            } catch (err) {
+                console.error("Action failed:", err);
             } finally {
                 isRunning = false;
-
-                if (waitForActionCompletion) {
-                    if (isPointerDown) {
-                        button.classList.add('awaiting-completion');
-                    } else {
-                        runReleaseAnimation();
-                    }
-                } else if (!isPointerDown) {
+                
+                // 3. Only release if the user has let go of the button
+                // If they are still holding it, 'isPointerDown' will be true 
+                // (set by a new pointerdown or maintained if this was a long press)
+                if (!isPointerDown) {
                     runReleaseAnimation();
+                } else if (waitForActionCompletion) {
+                    button.classList.add('awaiting-completion');
                 }
             }
         });
+
+        button.addEventListener('pointercancel', (e) => {
+            isPointerDown = false;
+            try { button.releasePointerCapture(e.pointerId); } catch(err) {}
+            if (!isRunning) runReleaseAnimation();
+        });
+
+        // Remove the 'click' listener entirely. 
+        // Pointerup is more reliable for PWAs and handles the logic better.
     }
 
     async function wakeBackendServer() {

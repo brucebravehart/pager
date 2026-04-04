@@ -51,6 +51,9 @@ button {
     box-shadow 180ms ease,
     filter 180ms ease,
     background-color 180ms ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent; /* Removes the ugly grey box on iOS */
+  user-select: none;
 }
 
 button::after {
