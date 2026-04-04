@@ -3,16 +3,16 @@ const CACHE_NAME = `pager-static-${CACHE_VERSION}`;
 const API_PATHS = ['/status', '/users', '/register_user', '/send-push'];
 // Add every file your app needs to run (HTML, CSS, JS, Images)
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/script.js',
-  '/alert_small.png',
-  '/alert_small_bw.png',
-  '/manifest.json',
-  '/favicon.ico',
-  '/icon-192.png',
-  '/icon-512.png'
+  './',
+  'index.html',
+  'style.css',
+  'script.js',
+  'alert_small.png',
+  'alert_small_bw.png',
+  'manifest.json',
+  'favicon.ico',
+  'icon-192.png',
+  'icon-512.png'
 ];
 
 // 1. INSTALL: Save the files locally
