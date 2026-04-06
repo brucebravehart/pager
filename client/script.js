@@ -52,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     await existingSubscription.unsubscribe();
                     console.log("Old subscription cleared.");
                 }
+                // Register for Push
                 const subscription = await subscribeUserToPush();
 
                 const subscriptionJson = {

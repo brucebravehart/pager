@@ -5,13 +5,14 @@ on:
     paths:
       - "client/**"
       - ".github/workflows/deploy.yml"
-  workflow_dispatch:
+  workflow_dispatch: # Allows you to manually trigger a deploy from the UI
 
 permissions:
   contents: read
   pages: write
   id-token: write
 
+# Prevents multiple deployments from running at the same time
 concurrency:
   group: "pages"
   cancel-in-progress: true

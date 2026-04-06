@@ -49,11 +49,13 @@ struct ApiResponse {
 async fn main() {
     dotenv().ok(); // get env vars
 
+    // get Port from Render else 10000
     let port = std::env::var("PORT")
         .unwrap_or_else(|_| "10000".to_string())
         .parse::<u16>()
         .expect("PORT must be a number");
 
+    // connect to db
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     let options = sqlx::postgres::PgConnectOptions::new()
@@ -70,12 +72,15 @@ async fn main() {
         .expect("Failed to connect to DB");
     let state = AppState { db: pool };
 
+    // Initialize DB file if it doesn't exist
     if fs::metadata(DB_PATH).await.is_err() {
         let initial_db = serde_json::to_string(&Db::default()).unwrap();
         fs::write(DB_PATH, initial_db)
             .await
             .expect("Failed to create DB file");
     }
+
+    // network stuff
 
     let cors = CorsLayer::new()
         .allow_origin(
@@ -119,10 +124,12 @@ async fn register_user(
     State(state): State<AppState>,
     Json(payload): Json<Value>,
 ) -> impl axum::response::IntoResponse {
+    println!("received request");
     let mut db = read_db().await;
     if db.usernames.len() < USER_LIMIT {
         let name = payload["name"].as_str().unwrap_or("Unknown").to_string();
         let sub_obj = payload["subObj"].clone();
+        println!("{}", name);
 
         let result = write_db_remote(&state.db, name.clone(), sub_obj.clone()).await;
 
@@ -169,6 +176,7 @@ async fn send_push(
         .iter()
         .position(|json| json["endpoint"].as_str() == trigger_sub_obj["endpoint"].as_str());
 
+    // Loop through and send to everyone else
     if let Some(skip_idx) = index {
         println!(
             "Sender identified as index {}. Broadcasting to others...",
@@ -182,25 +190,20 @@ async fn send_push(
 
         for (i, sub) in sub_objs.iter().enumerate() {
             if i == skip_idx {
-                continue;
+                continue; // Skip the person who triggered the push
             }
 
             println!("Sending notification to user: {}", rows[i].1.clone());
 
-            let current_sub_obj = sub.clone();
+            // decode sub_obj
+            let crnt_sub_obj = sub.clone();
 
-            let endpoint: &str = current_sub_obj
+            let endpoint: &str = crnt_sub_obj
                 .get("endpoint")
                 .and_then(|v| v.as_str())
                 .unwrap();
-            let p256dh: &str = current_sub_obj
-                .get("p256dh")
-                .and_then(|v| v.as_str())
-                .unwrap();
-            let auth: &str = current_sub_obj
-                .get("auth")
-                .and_then(|v| v.as_str())
-                .unwrap();
+            let p256dh: &str = crnt_sub_obj.get("p256dh").and_then(|v| v.as_str()).unwrap();
+            let auth: &str = crnt_sub_obj.get("auth").and_then(|v| v.as_str()).unwrap();
 
             let endpoint = endpoint
                 .parse()
@@ -224,10 +227,12 @@ async fn send_push(
                 )
             })?;
 
+            // 3. Construct the message
             let builder =
                 WebPushBuilder::new(endpoint, public_key, Auth::clone_from_slice(&auth_bytes))
                     .with_vapid(&key_pair, VAPID_SUBJECT);
 
+            // 4. Send it via an HTTP client
             let payload = serde_json::json!({
                 "title": "GROSS ALARM!",
                 "body": format!("ausgelöst durch {}", trigger_user),
@@ -267,7 +272,7 @@ async fn send_push(
             println!("Text: {}", response_text);
 
             if !status.is_success() {
-                let _ = delete_db_remote(&state.db, rows[i].0).await;
+                let _db_del_response = delete_db_remote(&state.db, rows[i].0).await;
             }
 
             let pub_key_bytes = key_pair.public_key().to_bytes();
