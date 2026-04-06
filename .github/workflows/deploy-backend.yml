@@ -31,13 +31,11 @@ jobs:
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Stop the old service if it exists
             sudo systemctl stop rust-backend || true
 
-            # Ensure the directory exists
             mkdir -p ~/app
 
-      - name: Debug File Location
+      - name: Inspect build output
         run: ls -R server/target/
 
       - name: Upload Binary
@@ -46,9 +44,9 @@ jobs:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "server/target/x86_64-unknown-linux-gnu/release/rust-backend" # Replace with your binary name
+          source: "server/target/x86_64-unknown-linux-gnu/release/rust-backend"
           target: "~/app/"
-          strip_components: 4 # Removes the 'server/target/x86_64.../release/' folder structure
+          strip_components: 4
 
       - name: Restart Service
         uses: appleboy/ssh-action@v1.0.3
@@ -57,6 +55,5 @@ jobs:
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Make binary executable and restart
             chmod +x ~/app/rust-backend
             sudo systemctl restart rust-backend

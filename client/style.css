@@ -52,7 +52,7 @@ button {
     filter 180ms ease,
     background-color 180ms ease;
   touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent; /* Removes the ugly grey box on iOS */
+  -webkit-tap-highlight-color: transparent;
   user-select: none;
 }
 
@@ -141,10 +141,6 @@ button.secondary {
 ul {
   text-align: left;
   margin-top: 20px;
-}
-
-.pressed {
-  background-color: #9c9c9c;
 }
 
 .users-header {

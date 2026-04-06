@@ -1,23 +1,30 @@
 # pager
 
-## compile backend
+## Backend Build
 
+Build the Linux release binary with:
+
+```bash
 cargo build --release --target x86_64-unknown-linux-gnu
+```
 
-## networking
+## Deployment Notes
 
-- Serve frontend via github pages
-- Connect to backend via port 443
-- Host backend on OCI
-- Backend sends push to apple servers
-- Apple servers send push to iOS devices
-- we need to talk to the backend via https since the frontend is also secured
+- Frontend is served from GitHub Pages.
+- Backend runs on OCI and listens on port 443.
+- The frontend talks to the backend over HTTPS because the app is served securely.
+- Push notifications flow through Apple push services to iOS devices.
 
-## logging
+## Logging
 
-View all logs for the rust backend: journalctl -u rust-backend
+Use the following command to inspect the Rust backend logs:
 
-## useful commands
+```bash
+journalctl -u rust-backend
+```
 
-Connect to OCI
+## OCI Access
+
+```bash
 ssh -i "ssh-key-oci-2026-02-07.key" opc@132.226.217.85
+```

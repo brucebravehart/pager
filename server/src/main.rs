@@ -1,5 +1,3 @@
-// use axum::http::response;
-// use axum::ServiceExt;
 use axum::{
     extract::State,
     http::StatusCode,
@@ -7,37 +5,35 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-// use axum_server::tls_rustls::RustlsConfig; // Import TLS config
 use base64ct::{Base64UrlUnpadded, Encoding};
 use dotenvy::dotenv;
-// use rustls::ServerConfig;
-// use rustls_acme::{caches::DirCache, futures_rustls::rustls, AcmeConfig};
-use serde::{/*de::value, */ Deserialize, Serialize};
+use p256::elliptic_curve::sec1::ToEncodedPoint;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::env;
 use std::net::SocketAddr;
-// use std::path::PathBuf;
-// use std::sync::Arc;
 use tokio::fs;
-// use tokio_stream::StreamExt;
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
 use tower_http::normalize_path::NormalizePathLayer;
-// use web_push::*;
-use p256::elliptic_curve::sec1::ToEncodedPoint;
-use sqlx::{postgres::PgPoolOptions, PgPool};
 use web_push_native::{
     jwt_simple::algorithms::ES256KeyPair, p256::PublicKey, Auth, WebPushBuilder,
 };
 
-// Matches your JavaScript payload
+const USER_LIMIT: usize = 20;
+const VAPID_SUBJECT: &str = "mailto:john.doe@example.com";
+const VAPID_PUBLIC_KEY: &str =
+    "BDspVj_KfBb-AOxX8zg69l74H_YRwHXr_D6mk0gdqxKy0UOqFRn1wJeD5JIvgGiSvtbq9feY0J0O4ytzaUzWxJU";
+
+// Local cache kept for compatibility with older client state.
 #[derive(Serialize, Deserialize, Default)]
 struct Db {
     usernames: Vec<String>,
     sub_objs: Vec<Value>,
 }
 
-#[derive(Clone)] // This is crucial! Axum clones the state for every request.
+#[derive(Clone)]
 struct AppState {
     db: PgPool,
 }
@@ -51,18 +47,14 @@ struct ApiResponse {
 
 #[tokio::main]
 async fn main() {
-    // get env vars
-    dotenv().ok();
+    dotenv().ok(); // get env vars
 
-    // get Port from render, else is 10000
     let port = std::env::var("PORT")
         .unwrap_or_else(|_| "10000".to_string())
         .parse::<u16>()
         .expect("PORT must be a number");
 
-    // connect to db
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    println!("format {database_url}");
 
     let options = sqlx::postgres::PgConnectOptions::new()
         .host("ep-quiet-art-alcgs14k.c-3.eu-central-1.aws.neon.tech")
@@ -78,15 +70,12 @@ async fn main() {
         .expect("Failed to connect to DB");
     let state = AppState { db: pool };
 
-    // Initialize DB file if it doesn't exist
     if fs::metadata(DB_PATH).await.is_err() {
         let initial_db = serde_json::to_string(&Db::default()).unwrap();
         fs::write(DB_PATH, initial_db)
             .await
             .expect("Failed to create DB file");
     }
-
-    // network stuff
 
     let cors = CorsLayer::new()
         .allow_origin(
@@ -104,59 +93,17 @@ async fn main() {
         .route("/status", get(return_status))
         .with_state(state)
         .layer(cors);
-    // Add CORS so your frontend can actually talk to it
 
     let app = ServiceBuilder::new()
         .layer(NormalizePathLayer::trim_trailing_slash())
         .service(router);
-
-    // Load your SSL Certificates
-    // You need 'cert.pem' and 'key.pem' in your project folder
-    /*let config = RustlsConfig::from_pem_file("cert.pem", "key.pem")
-    .await
-    .expect("Failed to load certificates. Do they exist?");*/
-
-    /*
-    let config = AcmeConfig::new(["pager-87gw.onrender.com"]) // Replace with your domain
-        .contact(["mailto:asdf@gmail.com"]) // Replace with your email
-        .cache(DirCache::new(PathBuf::from("./rustls_acme_cache")))
-        .directory_lets_encrypt(true); // Use production Let's Encrypt
-
-    let mut state = config.state();
-    let resolver = state.resolver();
-
-    let server_config = ServerConfig::builder()
-        .with_no_client_auth()
-        .with_cert_resolver(resolver);
-
-    let rustls_config = Arc::new(server_config);
-    let acceptor = state.axum_acceptor(rustls_config);*/
-
-    /*
-    tokio::spawn(async move {
-        loop {
-            match state.next().await {
-                Some(Ok(event)) => println!("ACME Event: {:?}", event),
-                Some(Err(e)) => eprintln!("ACME Error: {:?}", e),
-                None => break,
-            }
-        }
-    });*/
-
-    // Binding to port 443 requires sudo on Linux
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     println!("Server running on http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, tower::make::Shared::new(app))
         .await
-        .unwrap(); // old axum setup without tls*/
-
-    /*axum_server::bind(addr)
-    .acceptor(acceptor)
-    .serve(tower::make::Shared::new(app))
-    .await
-    .unwrap();*/
+        .unwrap();
 }
 
 // GET /users
@@ -165,9 +112,6 @@ async fn get_users(State(state): State<AppState>) -> Result<Json<Vec<String>>, S
     let usernames: Vec<String> = rows.iter().map(|row| row.1.clone()).collect();
 
     Ok(Json(usernames))
-
-    // let db = read_db().await;
-    // Json(db.usernames)
 }
 
 // POST /register_user
@@ -175,12 +119,10 @@ async fn register_user(
     State(state): State<AppState>,
     Json(payload): Json<Value>,
 ) -> impl axum::response::IntoResponse {
-    println!("received request");
     let mut db = read_db().await;
-    if db.usernames.len() < 20 {
+    if db.usernames.len() < USER_LIMIT {
         let name = payload["name"].as_str().unwrap_or("Unknown").to_string();
         let sub_obj = payload["subObj"].clone();
-        println!("{}", name);
 
         let result = write_db_remote(&state.db, name.clone(), sub_obj.clone()).await;
 
@@ -212,8 +154,6 @@ async fn send_push(
     State(state): State<AppState>,
     Json(payload): Json<Value>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let vapid_public_key =
-        "BDspVj_KfBb-AOxX8zg69l74H_YRwHXr_D6mk0gdqxKy0UOqFRn1wJeD5JIvgGiSvtbq9feY0J0O4ytzaUzWxJU";
     let vapid_private_key = env::var("VAPID_PRIVATE_KEY").expect("VAPID_PRIVATE_KEY must be set");
 
     let rows = read_db_remote(&state.db)
@@ -222,10 +162,6 @@ async fn send_push(
 
     let sub_objs: Vec<Value> = rows.iter().map(|row| row.2.clone()).collect();
 
-    // let db = read_db().await;
-    // let usernames = &db.usernames;
-    // let sub_objs = &db.sub_objs;
-
     let trigger_user = payload["name"].as_str().unwrap_or("Unknown").to_string();
     let trigger_sub_obj = payload["subObj"].clone();
 
@@ -233,7 +169,6 @@ async fn send_push(
         .iter()
         .position(|json| json["endpoint"].as_str() == trigger_sub_obj["endpoint"].as_str());
 
-    // Loop through and send to everyone else
     if let Some(skip_idx) = index {
         println!(
             "Sender identified as index {}. Broadcasting to others...",
@@ -247,21 +182,25 @@ async fn send_push(
 
         for (i, sub) in sub_objs.iter().enumerate() {
             if i == skip_idx {
-                continue; // Skip the person who triggered the push
+                continue;
             }
 
-            // This is where you call the actual push logic for each 'sub'
             println!("Sending notification to user: {}", rows[i].1.clone());
 
-            // decode sub_obj
-            let crnt_sub_obj = sub.clone();
+            let current_sub_obj = sub.clone();
 
-            let endpoint: &str = crnt_sub_obj
+            let endpoint: &str = current_sub_obj
                 .get("endpoint")
                 .and_then(|v| v.as_str())
                 .unwrap();
-            let p256dh: &str = crnt_sub_obj.get("p256dh").and_then(|v| v.as_str()).unwrap();
-            let auth: &str = crnt_sub_obj.get("auth").and_then(|v| v.as_str()).unwrap();
+            let p256dh: &str = current_sub_obj
+                .get("p256dh")
+                .and_then(|v| v.as_str())
+                .unwrap();
+            let auth: &str = current_sub_obj
+                .get("auth")
+                .and_then(|v| v.as_str())
+                .unwrap();
 
             let endpoint = endpoint
                 .parse()
@@ -285,12 +224,10 @@ async fn send_push(
                 )
             })?;
 
-            // 3. Construct the message
             let builder =
                 WebPushBuilder::new(endpoint, public_key, Auth::clone_from_slice(&auth_bytes))
-                    .with_vapid(&key_pair, "mailto:john.doe@example.com");
+                    .with_vapid(&key_pair, VAPID_SUBJECT);
 
-            // 4. Send it via an HTTP client
             let payload = serde_json::json!({
                 "title": "GROSS ALARM!",
                 "body": format!("ausgelöst durch {}", trigger_user),
@@ -322,7 +259,7 @@ async fn send_push(
             let status = response.status();
             let response_text = response.text().await.map_err(|e| {
                 (
-                    reqwest::StatusCode::INTERNAL_SERVER_ERROR, // Or a specific code
+                    reqwest::StatusCode::INTERNAL_SERVER_ERROR,
                     format!("Failed to read response body: {}", e),
                 )
             })?;
@@ -330,7 +267,7 @@ async fn send_push(
             println!("Text: {}", response_text);
 
             if !status.is_success() {
-                let _db_del_response = delete_db_remote(&state.db, rows[i].0).await;
+                let _ = delete_db_remote(&state.db, rows[i].0).await;
             }
 
             let pub_key_bytes = key_pair.public_key().to_bytes();
@@ -343,7 +280,7 @@ async fn send_push(
             let encoded_point = standard_key.to_encoded_point(false);
             let derived_public_key = Base64UrlUnpadded::encode_string(encoded_point.as_bytes());
             println!("Derived: {}", derived_public_key);
-            println!("Hardcoded: {}", vapid_public_key);
+            println!("Hardcoded: {}", VAPID_PUBLIC_KEY);
         }
         let response = ApiResponse {
             message: "Broadcast complete".to_string(),

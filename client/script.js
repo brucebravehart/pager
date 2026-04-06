@@ -1,5 +1,6 @@
 const VAPID_PUBLIC_KEY = "BDspVj_KfBb-AOxX8zg69l74H_YRwHXr_D6mk0gdqxKy0UOqFRn1wJeD5JIvgGiSvtbq9feY0J0O4ytzaUzWxJU"; // Get this from your backend
 const BACKEND_URL = "https://pager-87gw.onrender.com:443"
+const STORAGE_KEY = 'pwa_user_name';
 
 disablePinchZoom();
 
@@ -20,10 +21,10 @@ document.addEventListener('DOMContentLoaded', () => {
     wakeBackendServer();
 
     // 1. Check if user already exists
-    const savedName = localStorage.getItem('pwa_user_name');
+    const savedUser = getStoredUser();
 
-    if (savedName) {
-        showHomeScreen(JSON.parse(savedName).name);
+    if (savedUser) {
+        showHomeScreen(savedUser.name);
     } else {
         onboarding.classList.remove('hidden');
     }
@@ -51,7 +52,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     await existingSubscription.unsubscribe();
                     console.log("Old subscription cleared.");
                 }
-                // Register for Push
                 const subscription = await subscribeUserToPush();
 
                 const subscriptionJson = {
@@ -74,9 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 console.log(response, response_json)
 
-                localStorage.setItem('pwa_user_name', JSON.stringify({'name': name, 'subObj': subscriptionJson}));
-
-                showHomeScreen(name);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({'name': name, 'subObj': subscriptionJson}));
             } else {
                 alert("Permission denied. We need notifications to work!");
             }
@@ -85,7 +83,6 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Push registration failed:", err);
         }
 
-        // TODO: debug
         showHomeScreen(name);
     }, { waitForActionCompletion: true });
 
@@ -109,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
             if (!response.ok) throw new Error('Network response was not ok');
 
-            const data = await response.json();
+            await response.json();
 
             const listElement = document.getElementById('itemList')
 
@@ -147,23 +144,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Home Screen Actions
     bindAnimatedButton(actionBtn, async () => {
-        const name = JSON.parse(localStorage.getItem('pwa_user_name')).name;
+        const storedUser = getStoredUser();
+        if (!storedUser) return;
 
-        let subscriptionJson = JSON.parse(localStorage.getItem('pwa_user_name')).subObj;
+        const { name, subObj: subscriptionJson } = storedUser;
 
 
         try {
-        const response = await fetch(BACKEND_URL + '/send-push', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({'name': name, 'subObj': subscriptionJson})
-        })
+            const response = await fetch(BACKEND_URL + '/send-push', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({'name': name, 'subObj': subscriptionJson})
+            })
 
-        if (!response.ok) throw new Error('Network response was not ok');
+            if (!response.ok) throw new Error('Network response was not ok');
 
-        const data = await response.json();
+            const data = await response.json();
 
         } catch (error) {
             console.error("Push send failed:", error);
@@ -246,6 +244,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Remove the 'click' listener entirely. 
         // Pointerup is more reliable for PWAs and handles the logic better.
+    }
+
+    function getStoredUser() {
+        const storedUser = localStorage.getItem(STORAGE_KEY);
+        return storedUser ? JSON.parse(storedUser) : null;
     }
 
     async function wakeBackendServer() {
