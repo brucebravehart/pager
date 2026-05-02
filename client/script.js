@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
             if (!response.ok) throw new Error('Network response was not ok');
 
-            await response.json();
+            const data = await response.json();
 
             const listElement = document.getElementById('itemList')
 
